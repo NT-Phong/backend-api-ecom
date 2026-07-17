@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Content Include="Features\.DS_Store" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Ecom.Domain\Ecom.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+      <PackageReference Include="MediatR" Version="14.0.0" />
+      <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.9" />
+      <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.102">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.2" />
+      <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.2" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Features\SensorDevice\Queries\GetSensorDeviceById\" />
+    </ItemGroup>
+</Project>

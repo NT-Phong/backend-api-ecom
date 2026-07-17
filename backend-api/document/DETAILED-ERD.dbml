@@ -1,0 +1,889 @@
+Project ThanhHoaCommerce {
+  database_type: 'PostgreSQL'
+}
+
+Table Tbl_AdministrativeArea {
+Table Tbl_User {
+  Id uuid [pk]
+}
+
+  Id uuid [pk]
+  ParentId uuid
+  Code text
+  Name text
+  Level text
+  DisplayOrder int
+  IsActive boolean
+}
+
+Table Tbl_AnalyticsEvent {
+  Id uuid [pk]
+  VisitorSessionId uuid
+  ProductId uuid
+  CampaignId uuid
+  EventType text
+  Path text
+  SearchTerm text
+  OccurredAt datetime
+}
+
+Table Tbl_Article {
+  Id uuid [pk]
+  AuthorUserId uuid
+  Title text
+  Slug text
+  Summary text
+  Content text
+  CoverMediaAssetId uuid
+  Status text
+  PublishedAt datetime
+  MetaTitle text
+  MetaDescription text
+}
+
+Table Tbl_ArticleCategory {
+  Id uuid [pk]
+  Name text
+  Slug text
+  Description text
+}
+
+Table Tbl_ArticleCategoryMap {
+  Id uuid [pk]
+  ArticleId uuid
+  ArticleCategoryId uuid
+}
+
+Table Tbl_AuditLog {
+  Id uuid [pk]
+  ActorUserId uuid
+  Action text
+  EntityName text
+  EntityId uuid
+  CorrelationId uuid
+  BeforeData text
+  AfterData text
+  OccurredAt datetime
+  IpAddress text
+}
+
+Table Tbl_Banner {
+  Id uuid [pk]
+  CampaignId uuid
+  MediaAssetId uuid
+  Title text
+  AltText text
+  TargetUrl text
+  StartsAt datetime
+  EndsAt datetime
+  DisplayOrder int
+  Status text
+}
+
+Table Tbl_Campaign {
+  Id uuid [pk]
+  Code text
+  Name text
+  Description text
+  StartsAt datetime
+  EndsAt datetime
+  Status text
+}
+
+Table Tbl_Cart {
+  Id uuid [pk]
+  UserId uuid
+  GuestTokenHash text
+  Status text
+  CurrencyCode text
+  ExpiresAt datetime
+}
+
+Table Tbl_CartItem {
+  Id uuid [pk]
+  CartId uuid
+  ProductVariantId uuid
+  Quantity int
+}
+
+Table Tbl_Category {
+  Id uuid [pk]
+  ParentId uuid
+  Name text
+  Slug text
+  Description text
+  DisplayOrder int
+  Status text
+}
+
+Table Tbl_Certification {
+  Id uuid [pk]
+  CertificationType text
+  CertificateNumber text
+  IssuingAuthority text
+  IssuedAt text
+  EffectiveFrom text
+  EffectiveTo text
+  VerificationStatus text
+  VerifiedAt datetime
+  VerifiedByUserId uuid
+}
+
+Table Tbl_CertificationEvidence {
+  Id uuid [pk]
+  CertificationId uuid
+  MediaAssetId uuid
+  EvidenceType text
+}
+
+Table Tbl_Coupon {
+  Id uuid [pk]
+  PromotionId uuid
+  Code text
+  UsageLimit int
+  PerUserLimit int
+  StartsAt datetime
+  EndsAt datetime
+  Status text
+}
+
+Table Tbl_CouponCategory {
+  Id uuid [pk]
+  CouponId uuid
+  CategoryId uuid
+}
+
+Table Tbl_CouponProduct {
+  Id uuid [pk]
+  CouponId uuid
+  ProductId uuid
+}
+
+Table Tbl_CouponRedemption {
+  Id uuid [pk]
+  CouponId uuid
+  UserId uuid
+  OrderId uuid
+  RedeemedAt datetime
+  DiscountAmount decimal
+}
+
+Table Tbl_CustomerAddress {
+  Id uuid [pk]
+  UserId uuid
+  AdministrativeAreaId uuid
+  RecipientName text
+  PhoneNumber text
+  AddressLine text
+  PostalCode text
+  Latitude decimal
+  Longitude decimal
+  Label text
+  IsDefault boolean
+}
+
+Table Tbl_CustomerProfile {
+  Id uuid [pk]
+  UserId uuid
+  PreferredName text
+  DateOfBirth text
+  Gender text
+  MarketingConsentAt datetime
+}
+
+Table Tbl_FacilityCertification {
+  Id uuid [pk]
+  ProductionFacilityId uuid
+  CertificationId uuid
+}
+
+Table Tbl_InquiryAttachment {
+  Id uuid [pk]
+  TradeInquiryId uuid
+  PartnerApplicationId uuid
+  MediaAssetId uuid
+  Visibility text
+}
+
+Table Tbl_InventoryItem {
+  Id uuid [pk]
+  ProductVariantId uuid
+  RequiresShipping boolean
+}
+
+Table Tbl_InventoryLevel {
+  Id uuid [pk]
+  InventoryItemId uuid
+  StockLocationId uuid
+  StockedQuantity decimal
+  ReservedQuantity decimal
+  IncomingQuantity decimal
+}
+
+Table Tbl_InventoryMovement {
+  Id uuid [pk]
+  InventoryItemId uuid
+  StockLocationId uuid
+  OrderItemId uuid
+  MovementType text
+  QuantityDelta decimal
+  Reason text
+  OccurredAt datetime
+}
+
+Table Tbl_InventoryReservation {
+  Id uuid [pk]
+  InventoryItemId uuid
+  StockLocationId uuid
+  OrderItemId uuid
+  Quantity decimal
+  Status text
+  ExpiresAt datetime
+  ReleasedAt datetime
+}
+
+Table Tbl_MediaAsset {
+  Id uuid [pk]
+  StorageKey text
+  OriginalFileName text
+  ContentType text
+  SizeBytes bigint
+  MediaType text
+  AltText text
+  Visibility text
+  ScanStatus text
+}
+
+Table Tbl_NavigationItem {
+  Id uuid [pk]
+  ParentId uuid
+  PageId uuid
+  Label text
+  TargetUrl text
+  DisplayOrder int
+  Status text
+}
+
+Table Tbl_NewsletterSubscription {
+  Id uuid [pk]
+  UserId uuid
+  Email text
+  Status text
+  ConsentAt datetime
+  UnsubscribedAt datetime
+  Source text
+}
+
+Table Tbl_Notification {
+  Id uuid [pk]
+  NotificationType text
+  Title text
+  Body text
+  Data text
+  CreatedBySystem boolean
+}
+
+Table Tbl_Order {
+  Id uuid [pk]
+  OrderNumber text
+  UserId uuid
+  CustomerEmailSnapshot text
+  CustomerPhoneSnapshot text
+  RecipientNameSnapshot text
+  RecipientPhoneSnapshot text
+  AdministrativeAreaId uuid
+  ShippingAddressSnapshot text
+  Status text
+  CurrencyCode text
+  SubtotalAmount decimal
+  DiscountAmount decimal
+  ShippingAmount decimal
+  GrandTotalAmount decimal
+  PlacedAt datetime
+}
+
+Table Tbl_OrderDiscount {
+  Id uuid [pk]
+  OrderId uuid
+  OrderItemId uuid
+  PromotionId uuid
+  CouponId uuid
+  Description text
+  DiscountAmount decimal
+}
+
+Table Tbl_OrderItem {
+  Id uuid [pk]
+  OrderId uuid
+  ProductVariantId uuid
+  ProductNameSnapshot text
+  VariantNameSnapshot text
+  SkuSnapshot text
+  UnitPriceSnapshot decimal
+  Quantity int
+  DiscountAmountSnapshot decimal
+  LineTotalAmount decimal
+}
+
+Table Tbl_OrderNote {
+  Id uuid [pk]
+  OrderId uuid
+  AuthorUserId uuid
+  NoteType text
+  Content text
+  IsVisibleToCustomer boolean
+}
+
+Table Tbl_OrderStatusHistory {
+  Id uuid [pk]
+  OrderId uuid
+  FromStatus text
+  ToStatus text
+  Reason text
+  ChangedByUserId uuid
+  ChangedAt datetime
+}
+
+Table Tbl_Page {
+  Id uuid [pk]
+  Title text
+  Slug text
+  Status text
+  PublishedAt datetime
+  MetaTitle text
+  MetaDescription text
+}
+
+Table Tbl_PageSection {
+  Id uuid [pk]
+  PageId uuid
+  SectionType text
+  Title text
+  Content text
+  DisplayOrder int
+  Status text
+}
+
+Table Tbl_PageSectionProduct {
+  Id uuid [pk]
+  PageSectionId uuid
+  ProductId uuid
+  DisplayOrder int
+}
+
+Table Tbl_PartnerApplication {
+  Id uuid [pk]
+  UserId uuid
+  ApplicantName text
+  OrganizationName text
+  Email text
+  PhoneNumber text
+  ApplicationType text
+  Status text
+  Message text
+  AssignedToUserId uuid
+}
+
+Table Tbl_Payment {
+  Id uuid [pk]
+  OrderId uuid
+  Method text
+  Status text
+  Amount decimal
+  DueAt datetime
+  PaidAt datetime
+}
+
+Table Tbl_PaymentTransaction {
+  Id uuid [pk]
+  PaymentId uuid
+  Provider text
+  ProviderReference text
+  TransactionType text
+  Status text
+  Amount decimal
+  OccurredAt datetime
+  ProofMediaAssetId uuid
+}
+
+Table Tbl_PointOfSale {
+  Id uuid [pk]
+  ProducerId uuid
+  AdministrativeAreaId uuid
+  Name text
+  AddressLine text
+  PhoneNumber text
+  Latitude decimal
+  Longitude decimal
+  OpeningHours text
+  PublicStatus text
+}
+
+Table Tbl_PointOfSaleProduct {
+  Id uuid [pk]
+  PointOfSaleId uuid
+  ProductId uuid
+  IsAvailable boolean
+}
+
+Table Tbl_PriceList {
+  Id uuid [pk]
+  Code text
+  Name text
+  Status text
+  StartsAt datetime
+  EndsAt datetime
+  Description text
+}
+
+Table Tbl_Producer {
+  Id uuid [pk]
+  Code text
+  Name text
+  LegalName text
+  Description text
+  WebsiteUrl text
+  PublicStatus text
+  IsVerified boolean
+  VerifiedAt datetime
+  VerifiedByUserId uuid
+}
+
+Table Tbl_ProducerCertification {
+  Id uuid [pk]
+  ProducerId uuid
+  CertificationId uuid
+}
+
+Table Tbl_ProducerContact {
+  Id uuid [pk]
+  ProducerId uuid
+  ContactType text
+  ContactValue text
+  ContactName text
+  IsPublic boolean
+  DisplayOrder int
+}
+
+Table Tbl_Product {
+  Id uuid [pk]
+  ProducerId uuid
+  Name text
+  Slug text
+  ShortDescription text
+  Description text
+  UsageInstructions text
+  StorageInstructions text
+  WarningText text
+  Status text
+  PublishedAt datetime
+  UnpublishedAt datetime
+  MetaTitle text
+  MetaDescription text
+}
+
+Table Tbl_ProductAnswer {
+  Id uuid [pk]
+  ProductQuestionId uuid
+  AnsweredByUserId uuid
+  Content text
+  Status text
+  AnsweredAt datetime
+}
+
+Table Tbl_ProductCategory {
+  Id uuid [pk]
+  ProductId uuid
+  CategoryId uuid
+  IsPrimary boolean
+}
+
+Table Tbl_ProductCertification {
+  Id uuid [pk]
+  ProductId uuid
+  CertificationId uuid
+}
+
+Table Tbl_ProductionFacility {
+  Id uuid [pk]
+  ProducerId uuid
+  AdministrativeAreaId uuid
+  Name text
+  AddressLine text
+  Latitude decimal
+  Longitude decimal
+  PublicStatus text
+  Description text
+}
+
+Table Tbl_ProductMedia {
+  Id uuid [pk]
+  ProductId uuid
+  MediaAssetId uuid
+  DisplayOrder int
+  IsPrimary boolean
+  Caption text
+}
+
+Table Tbl_ProductOption {
+  Id uuid [pk]
+  ProductId uuid
+  Code text
+  Name text
+  DisplayOrder int
+}
+
+Table Tbl_ProductOptionValue {
+  Id uuid [pk]
+  ProductOptionId uuid
+  Value text
+  DisplayOrder int
+}
+
+Table Tbl_ProductQuestion {
+  Id uuid [pk]
+  ProductId uuid
+  UserId uuid
+  GuestName text
+  GuestEmail text
+  Content text
+  Status text
+  AskedAt datetime
+}
+
+Table Tbl_ProductReview {
+  Id uuid [pk]
+  ProductId uuid
+  UserId uuid
+  OrderItemId uuid
+  Rating int
+  Title text
+  Content text
+  ModerationStatus text
+  ReviewedAt datetime
+}
+
+Table Tbl_ProductReviewMedia {
+  Id uuid [pk]
+  ProductReviewId uuid
+  MediaAssetId uuid
+}
+
+Table Tbl_ProductSlugHistory {
+  Id uuid [pk]
+  ProductId uuid
+  Slug text
+  RedirectStatusCode int
+}
+
+Table Tbl_ProductVariant {
+  Id uuid [pk]
+  ProductId uuid
+  Sku text
+  Name text
+  Barcode text
+  Status text
+  InventoryMode text
+  AllowBackorder boolean
+  WeightGrams decimal
+  DisplayOrder int
+}
+
+Table Tbl_ProductVariantOptionValue {
+  Id uuid [pk]
+  ProductVariantId uuid
+  ProductOptionValueId uuid
+}
+
+Table Tbl_Promotion {
+  Id uuid [pk]
+  Code text
+  Name text
+  PromotionType text
+  Value decimal
+  StartsAt datetime
+  EndsAt datetime
+  Status text
+  MinOrderAmount decimal
+}
+
+Table Tbl_SeoRedirect {
+  Id uuid [pk]
+  SourcePath text
+  TargetPath text
+  StatusCode int
+  IsActive boolean
+}
+
+Table Tbl_Shipment {
+  Id uuid [pk]
+  OrderId uuid
+  ShippingMethod text
+  CarrierName text
+  TrackingCode text
+  Status text
+  ShippedAt datetime
+  DeliveredAt datetime
+}
+
+Table Tbl_ShipmentHistory {
+  Id uuid [pk]
+  ShipmentId uuid
+  FromStatus text
+  ToStatus text
+  Reason text
+  ChangedByUserId uuid
+  OccurredAt datetime
+}
+
+Table Tbl_ShipmentItem {
+  Id uuid [pk]
+  ShipmentId uuid
+  OrderItemId uuid
+  Quantity int
+}
+
+Table Tbl_StockLocation {
+  Id uuid [pk]
+  Code text
+  Name text
+  AdministrativeAreaId uuid
+  AddressLine text
+  IsActive boolean
+}
+
+Table Tbl_SystemSetting {
+  Id uuid [pk]
+  SettingKey text
+  Value text
+  IsPublic boolean
+  Description text
+}
+
+Table Tbl_TraceEvent {
+  Id uuid [pk]
+  TraceLotId uuid
+  EventType text
+  OccurredAt datetime
+  LocationText text
+  Description text
+  VerifiedByUserId uuid
+}
+
+Table Tbl_TraceEventEvidence {
+  Id uuid [pk]
+  TraceEventId uuid
+  MediaAssetId uuid
+}
+
+Table Tbl_TraceLot {
+  Id uuid [pk]
+  TraceProfileId uuid
+  LotCode text
+  ProducedAt text
+  ExpiresAt text
+  Status text
+}
+
+Table Tbl_TraceProfile {
+  Id uuid [pk]
+  ProductId uuid
+  PublicCode text
+  Summary text
+  PublicStatus text
+}
+
+Table Tbl_TradeInquiry {
+  Id uuid [pk]
+  InquiryNumber text
+  UserId uuid
+  ContactName text
+  CompanyName text
+  Email text
+  PhoneNumber text
+  InquiryType text
+  Status text
+  AssignedToUserId uuid
+  Message text
+}
+
+Table Tbl_TradeInquiryItem {
+  Id uuid [pk]
+  TradeInquiryId uuid
+  ProductId uuid
+  ProductVariantId uuid
+  RequestedQuantity decimal
+  RequirementText text
+}
+
+Table Tbl_TradeInquiryStatusHistory {
+  Id uuid [pk]
+  TradeInquiryId uuid
+  FromStatus text
+  ToStatus text
+  Reason text
+  ChangedByUserId uuid
+  ChangedAt datetime
+}
+
+Table Tbl_UserNotification {
+  Id uuid [pk]
+  NotificationId uuid
+  UserId uuid
+  DeliveryStatus text
+  ReadAt datetime
+  DeliveredAt datetime
+}
+
+Table Tbl_VariantPrice {
+  Id uuid [pk]
+  ProductVariantId uuid
+  PriceListId uuid
+  CurrencyCode text
+  Amount decimal
+  MinQuantity int
+  PriceType text
+  EffectiveFrom datetime
+  EffectiveTo datetime
+}
+
+Table Tbl_VisitorSession {
+  Id uuid [pk]
+  UserId uuid
+  SessionHash text
+  Source text
+  Medium text
+  Campaign text
+  ConsentStatus text
+  StartedAt datetime
+  EndedAt datetime
+}
+
+Table Tbl_Wishlist {
+  Id uuid [pk]
+  UserId uuid
+  Name text
+}
+
+Table Tbl_WishlistItem {
+  Id uuid [pk]
+  WishlistId uuid
+  ProductId uuid
+}
+
+// Relationships
+Ref: "Tbl_AdministrativeArea"."ParentId" > "Tbl_AdministrativeArea"."Id"
+Ref: "Tbl_AnalyticsEvent"."CampaignId" > "Tbl_Campaign"."Id"
+Ref: "Tbl_AnalyticsEvent"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_AnalyticsEvent"."VisitorSessionId" > "Tbl_VisitorSession"."Id"
+Ref: "Tbl_Article"."AuthorUserId" > "Tbl_User"."Id"
+Ref: "Tbl_Article"."CoverMediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_ArticleCategoryMap"."ArticleCategoryId" > "Tbl_ArticleCategory"."Id"
+Ref: "Tbl_ArticleCategoryMap"."ArticleId" > "Tbl_Article"."Id"
+Ref: "Tbl_Banner"."CampaignId" > "Tbl_Campaign"."Id"
+Ref: "Tbl_Banner"."MediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_Cart"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_CartItem"."CartId" > "Tbl_Cart"."Id"
+Ref: "Tbl_CartItem"."ProductVariantId" > "Tbl_ProductVariant"."Id"
+Ref: "Tbl_Category"."ParentId" > "Tbl_Category"."Id"
+Ref: "Tbl_CertificationEvidence"."CertificationId" > "Tbl_Certification"."Id"
+Ref: "Tbl_CertificationEvidence"."MediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_Coupon"."PromotionId" > "Tbl_Promotion"."Id"
+Ref: "Tbl_CouponCategory"."CategoryId" > "Tbl_Category"."Id"
+Ref: "Tbl_CouponCategory"."CouponId" > "Tbl_Coupon"."Id"
+Ref: "Tbl_CouponProduct"."CouponId" > "Tbl_Coupon"."Id"
+Ref: "Tbl_CouponProduct"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_CouponRedemption"."CouponId" > "Tbl_Coupon"."Id"
+Ref: "Tbl_CouponRedemption"."OrderId" > "Tbl_Order"."Id"
+Ref: "Tbl_CouponRedemption"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_CustomerAddress"."AdministrativeAreaId" > "Tbl_AdministrativeArea"."Id"
+Ref: "Tbl_CustomerAddress"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_CustomerProfile"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_FacilityCertification"."CertificationId" > "Tbl_Certification"."Id"
+Ref: "Tbl_FacilityCertification"."ProductionFacilityId" > "Tbl_ProductionFacility"."Id"
+Ref: "Tbl_InquiryAttachment"."MediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_InquiryAttachment"."PartnerApplicationId" > "Tbl_PartnerApplication"."Id"
+Ref: "Tbl_InquiryAttachment"."TradeInquiryId" > "Tbl_TradeInquiry"."Id"
+Ref: "Tbl_InventoryItem"."ProductVariantId" > "Tbl_ProductVariant"."Id"
+Ref: "Tbl_InventoryLevel"."InventoryItemId" > "Tbl_InventoryItem"."Id"
+Ref: "Tbl_InventoryLevel"."StockLocationId" > "Tbl_StockLocation"."Id"
+Ref: "Tbl_InventoryMovement"."InventoryItemId" > "Tbl_InventoryItem"."Id"
+Ref: "Tbl_InventoryMovement"."OrderItemId" > "Tbl_OrderItem"."Id"
+Ref: "Tbl_InventoryMovement"."StockLocationId" > "Tbl_StockLocation"."Id"
+Ref: "Tbl_InventoryReservation"."InventoryItemId" > "Tbl_InventoryItem"."Id"
+Ref: "Tbl_InventoryReservation"."OrderItemId" > "Tbl_OrderItem"."Id"
+Ref: "Tbl_InventoryReservation"."StockLocationId" > "Tbl_StockLocation"."Id"
+Ref: "Tbl_NavigationItem"."PageId" > "Tbl_Page"."Id"
+Ref: "Tbl_NavigationItem"."ParentId" > "Tbl_NavigationItem"."Id"
+Ref: "Tbl_NewsletterSubscription"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_Order"."AdministrativeAreaId" > "Tbl_AdministrativeArea"."Id"
+Ref: "Tbl_Order"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_OrderDiscount"."CouponId" > "Tbl_Coupon"."Id"
+Ref: "Tbl_OrderDiscount"."OrderId" > "Tbl_Order"."Id"
+Ref: "Tbl_OrderDiscount"."OrderItemId" > "Tbl_OrderItem"."Id"
+Ref: "Tbl_OrderDiscount"."PromotionId" > "Tbl_Promotion"."Id"
+Ref: "Tbl_OrderItem"."OrderId" > "Tbl_Order"."Id"
+Ref: "Tbl_OrderItem"."ProductVariantId" > "Tbl_ProductVariant"."Id"
+Ref: "Tbl_OrderNote"."OrderId" > "Tbl_Order"."Id"
+Ref: "Tbl_OrderStatusHistory"."OrderId" > "Tbl_Order"."Id"
+Ref: "Tbl_PageSection"."PageId" > "Tbl_Page"."Id"
+Ref: "Tbl_PageSectionProduct"."PageSectionId" > "Tbl_PageSection"."Id"
+Ref: "Tbl_PageSectionProduct"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_PartnerApplication"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_Payment"."OrderId" > "Tbl_Order"."Id"
+Ref: "Tbl_PaymentTransaction"."PaymentId" > "Tbl_Payment"."Id"
+Ref: "Tbl_PaymentTransaction"."ProofMediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_PointOfSale"."AdministrativeAreaId" > "Tbl_AdministrativeArea"."Id"
+Ref: "Tbl_PointOfSale"."ProducerId" > "Tbl_Producer"."Id"
+Ref: "Tbl_PointOfSaleProduct"."PointOfSaleId" > "Tbl_PointOfSale"."Id"
+Ref: "Tbl_PointOfSaleProduct"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProducerCertification"."CertificationId" > "Tbl_Certification"."Id"
+Ref: "Tbl_ProducerCertification"."ProducerId" > "Tbl_Producer"."Id"
+Ref: "Tbl_ProducerContact"."ProducerId" > "Tbl_Producer"."Id"
+Ref: "Tbl_Product"."ProducerId" > "Tbl_Producer"."Id"
+Ref: "Tbl_ProductAnswer"."AnsweredByUserId" > "Tbl_User"."Id"
+Ref: "Tbl_ProductAnswer"."ProductQuestionId" > "Tbl_ProductQuestion"."Id"
+Ref: "Tbl_ProductCategory"."CategoryId" > "Tbl_Category"."Id"
+Ref: "Tbl_ProductCategory"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductCertification"."CertificationId" > "Tbl_Certification"."Id"
+Ref: "Tbl_ProductCertification"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductionFacility"."AdministrativeAreaId" > "Tbl_AdministrativeArea"."Id"
+Ref: "Tbl_ProductionFacility"."ProducerId" > "Tbl_Producer"."Id"
+Ref: "Tbl_ProductMedia"."MediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_ProductMedia"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductOption"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductOptionValue"."ProductOptionId" > "Tbl_ProductOption"."Id"
+Ref: "Tbl_ProductQuestion"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductQuestion"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_ProductReview"."OrderItemId" > "Tbl_OrderItem"."Id"
+Ref: "Tbl_ProductReview"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductReview"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_ProductReviewMedia"."MediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_ProductReviewMedia"."ProductReviewId" > "Tbl_ProductReview"."Id"
+Ref: "Tbl_ProductSlugHistory"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductVariant"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_ProductVariantOptionValue"."ProductOptionValueId" > "Tbl_ProductOptionValue"."Id"
+Ref: "Tbl_ProductVariantOptionValue"."ProductVariantId" > "Tbl_ProductVariant"."Id"
+Ref: "Tbl_Shipment"."OrderId" > "Tbl_Order"."Id"
+Ref: "Tbl_ShipmentHistory"."ShipmentId" > "Tbl_Shipment"."Id"
+Ref: "Tbl_ShipmentItem"."OrderItemId" > "Tbl_OrderItem"."Id"
+Ref: "Tbl_ShipmentItem"."ShipmentId" > "Tbl_Shipment"."Id"
+Ref: "Tbl_StockLocation"."AdministrativeAreaId" > "Tbl_AdministrativeArea"."Id"
+Ref: "Tbl_TraceEvent"."TraceLotId" > "Tbl_TraceLot"."Id"
+Ref: "Tbl_TraceEventEvidence"."MediaAssetId" > "Tbl_MediaAsset"."Id"
+Ref: "Tbl_TraceEventEvidence"."TraceEventId" > "Tbl_TraceEvent"."Id"
+Ref: "Tbl_TraceLot"."TraceProfileId" > "Tbl_TraceProfile"."Id"
+Ref: "Tbl_TraceProfile"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_TradeInquiry"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_TradeInquiryItem"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_TradeInquiryItem"."ProductVariantId" > "Tbl_ProductVariant"."Id"
+Ref: "Tbl_TradeInquiryItem"."TradeInquiryId" > "Tbl_TradeInquiry"."Id"
+Ref: "Tbl_TradeInquiryStatusHistory"."TradeInquiryId" > "Tbl_TradeInquiry"."Id"
+Ref: "Tbl_UserNotification"."NotificationId" > "Tbl_Notification"."Id"
+Ref: "Tbl_UserNotification"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_VariantPrice"."PriceListId" > "Tbl_PriceList"."Id"
+Ref: "Tbl_VariantPrice"."ProductVariantId" > "Tbl_ProductVariant"."Id"
+Ref: "Tbl_VisitorSession"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_Wishlist"."UserId" > "Tbl_User"."Id"
+Ref: "Tbl_WishlistItem"."ProductId" > "Tbl_Product"."Id"
+Ref: "Tbl_WishlistItem"."WishlistId" > "Tbl_Wishlist"."Id"
