@@ -16,6 +16,11 @@ public interface IApplicationDbContext
     DbSet<JwtRefreshToken> JwtRefreshTokens { get; }
     DbSet<OtpToken> OtpTokens { get; }
     DbSet<UserDeviceToken> UserDeviceTokens { get; }
+    DbSet<UserSession> UserSessions { get; }
+    DbSet<SessionRefreshToken> SessionRefreshTokens { get; }
+    DbSet<VerificationChallenge> VerificationChallenges { get; }
+    DbSet<SecurityEvent> SecurityEvents { get; }
+    DbSet<PasswordCredential> PasswordCredentials { get; }
 
     // Database operations
     DatabaseFacade Database { get; }

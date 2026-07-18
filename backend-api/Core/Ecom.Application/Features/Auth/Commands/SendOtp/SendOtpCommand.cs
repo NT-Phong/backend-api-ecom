@@ -4,6 +4,7 @@
 /// Command gửi OTP đến số điện thoại
 /// Dùng cho đăng nhập, kích hoạt tài khoản, xác thực số điện thoại
 /// </summary>
+[EnableUnitOfWork]
 public record SendOtpCommand : IRequest<TResult<SendOtpResult>>
 {
     /// <summary>

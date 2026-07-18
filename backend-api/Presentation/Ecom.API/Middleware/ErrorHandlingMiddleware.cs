@@ -27,7 +27,8 @@ public class ErrorHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception has occurred: {Message}", ex.Message);
+            var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+            _logger.LogError("Unhandled request exception. ExceptionType: {ExceptionType}, TraceId: {TraceId}", ex.GetType().Name, traceId);
             await HandleExceptionAsync(context, ex);
         }
     }
@@ -41,9 +42,9 @@ public class ErrorHandlingMiddleware
             ValidationException validationException => (StatusCodes.Status400BadRequest, ErrorCodes.BAD_REQUEST, validationException.Errors.FirstOrDefault()?.ErrorMessage ?? "Dữ liệu không hợp lệ."),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, ErrorCodes.ALREADY_EXISTS, "The data was changed by another request. Reload it and try again."),
             ForbiddenAccessException => (StatusCodes.Status403Forbidden, ErrorCodes.FORBIDDEN, "You are not authorized to perform this action."),
-            UnauthorizedAccessException unauthorizedAccessException => (StatusCodes.Status401Unauthorized, ErrorCodes.UNAUTHORIZED, unauthorizedAccessException.Message),
-            KeyNotFoundException keyNotFoundException => (StatusCodes.Status404NotFound, ErrorCodes.NOT_FOUND, keyNotFoundException.Message),
-            InvalidOperationException invalidOperationException => (StatusCodes.Status400BadRequest, ErrorCodes.BAD_REQUEST, invalidOperationException.Message),
+            UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, ErrorCodes.UNAUTHORIZED, MessageKey.Unauthorized),
+            KeyNotFoundException => (StatusCodes.Status404NotFound, ErrorCodes.NOT_FOUND, MessageKey.ResourceNotFound),
+            InvalidOperationException => (StatusCodes.Status500InternalServerError, ErrorCodes.SERVER_ERROR, MessageKey.InternalError),
             _ => (StatusCodes.Status500InternalServerError, ErrorCodes.SERVER_ERROR, "An internal server error has occurred.")
         };
 

@@ -88,8 +88,6 @@ var forwardedHeaderOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 };
-forwardedHeaderOptions.KnownIPNetworks.Clear();
-forwardedHeaderOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeaderOptions);
 // CORS must be before other middleware to handle preflight OPTIONS requests
 app.UseCors("DefaultPolicy");
@@ -105,7 +103,7 @@ await Ecom.Infrastructure.Seeding.RoleSeeder.SeedAsync(app.Services);
 SerilogExtensions.InitializeHttpContextEnricher(app.Services);
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
     app.UseSwagger();
@@ -148,12 +146,14 @@ app.UseStaticFiles(new StaticFileOptions
 
 // Add custom middleware
 app.UseMiddleware<SecurityHeadersMiddleware>();
+app.UseMiddleware<AuthenticationResponseTimingMiddleware>();
 app.UseMiddleware<StructuredLoggingMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<ProxyAuthorizationMiddleware>();
 
 // Add standard middleware
 app.UseRequestTimeouts();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

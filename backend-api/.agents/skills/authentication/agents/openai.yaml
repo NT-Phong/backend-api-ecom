@@ -1,0 +1,4 @@
+interface:
+  display_name: "Authentication and Roles"
+  short_description: "Trace Ecom authentication, sessions, roles, and policies."
+  default_prompt: "Analyze or implement Ecom Authentication V2 and role-policy authorization from the current source."

@@ -1,117 +1,111 @@
-﻿using Ecom.Application.Common.Configuration;
+using Ecom.Application.Common.Configuration;
 using Ecom.Domain.Entities;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Ecom.Application.Features.Auth.Commands.CreateAccount;
 
-/// <summary>
-/// Handler để đăng ký tài khoản mới bằng số điện thoại
-/// User sau khi đăng ký sẽ ở trạng thái Pending, cần xác thực OTP để Active
-/// </summary>
 [EnableUnitOfWork]
-public class CreateAccountCommandHandler : IRequestHandler<CreateAccountCommand, TResult<CreateAccountResult>>
+public class CreateAccountCommandHandler(
+    IUnitOfWork unitOfWork,
+    ILogger<CreateAccountCommandHandler> logger,
+    IOptions<OtpSettings> otpOptions,
+    IOtpSecurityService otpSecurity,
+    ISmsSender smsSender,
+    IAuthRateLimitService rateLimiter)
+    : IRequestHandler<CreateAccountCommand, TResult<CreateAccountResult>>
 {
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogger<CreateAccountCommandHandler> _logger;
-    private readonly IHostEnvironment _env;
-    private readonly OtpSettings _otpSettings;
+    private readonly OtpSettings _otpSettings = otpOptions.Value;
 
-    public CreateAccountCommandHandler(
-        IUnitOfWork unitOfWork,
-        ILogger<CreateAccountCommandHandler> logger,
-        IHostEnvironment env,
-        IOptions<OtpSettings> otpOptions)
-    {
-        _unitOfWork = unitOfWork;
-        _logger = logger;
-        _env = env;
-        _otpSettings = otpOptions.Value;
-    }
-
-    public async Task<TResult<CreateAccountResult>> Handle(CreateAccountCommand request, CancellationToken cancellationToken)
+    public async Task<TResult<CreateAccountResult>> Handle(
+        CreateAccountCommand request,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.PhoneNumber))
-        {
             return TResult<CreateAccountResult>.Failure(MessageKey.PhoneNumberRequired, ErrorCodes.BAD_REQUEST);
-        }
 
-        _logger.LogInformation("Creating new account for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
+        var rateLimit = await rateLimiter.AcquireAsync(
+            AuthRateLimitPolicyNames.RegisterDestinationDaily,
+            request.PhoneNumber,
+            cancellationToken);
+        if (rateLimit.Status == AuthRateLimitStatus.Unavailable)
+            return TResult<CreateAccountResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
+        if (rateLimit.Status == AuthRateLimitStatus.Rejected)
+            return TResult<CreateAccountResult>.Failure(MessageKey.TooManyRequests, ErrorCodes.TOO_MANY_REQUESTS);
+        if (!smsSender.IsConfigured && !otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber))
+            return TResult<CreateAccountResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
+
         try
         {
-            var existingUserByPhone = await _unitOfWork.Repository<User>()
-                    .FindOneAsync(filters: [u => u.PhoneNumber == request.PhoneNumber]);
+            var existingUser = await unitOfWork.Repository<User>()
+                .FindOneAsync(filters: [u => u.PhoneNumber == request.PhoneNumber]);
 
-            if (existingUserByPhone != null && request.PhoneNumber != TestAccounts.Manager)
-            {
-                _logger.LogWarning("PhoneNumber {PhoneNumber} already exists", request.PhoneNumber);
-                return TResult<CreateAccountResult>.Failure(MessageKey.PhoneNumberAlreadyExists, ErrorCodes.ALREADY_EXISTS);
-            }
+            // Registration is deliberately non-enumerating. It does not issue a login challenge
+            // for an already existing account.
+            if (existingUser is not null && !otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber))
+                return Accepted(null);
 
-            User user;
-
-            if (existingUserByPhone != null && request.PhoneNumber == TestAccounts.Manager)
+            var user = existingUser;
+            if (user is null)
             {
-                user = existingUserByPhone;
-            }
-            else
-            {
-                var userRole = await _unitOfWork.Repository<Role>()
+                var userRole = await unitOfWork.Repository<Role>()
                     .FindOneAsync(filters: [r => r.Code == Permissions.Roles.User]);
-
                 user = new User(request.PhoneNumber, userRole?.Id);
-                await _unitOfWork.Repository<User>().InsertAsync(user, cancellationToken);
+                await unitOfWork.Repository<User>().InsertAsync(user, cancellationToken);
             }
 
-            string otpCode = request.PhoneNumber == TestAccounts.Manager
-                 ? "0000"
-                 : GenerateOtpCode(_otpSettings.OtpLength);
+            var isDevelopmentTestAccount = otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber);
+            var otpCode = isDevelopmentTestAccount
+                ? otpSecurity.DevelopmentOtp
+                : otpSecurity.GenerateCode();
+            var purpose = OtpTokenTypeEnum.ActivateAccount;
 
-            var expiryTime = DateTime.UtcNow.AddSeconds(_otpSettings.ExpirationSeconds);
-
-            var otpEntry = new OtpToken
+            await unitOfWork.Repository<OtpToken>().InsertAsync(new OtpToken
             {
                 UserId = user.Id,
                 PhoneNumber = user.PhoneNumber,
-                OtpTokenType = OtpTokenTypeEnum.ActivateAccount,
-                Code = otpCode,
-                ExpiredAt = expiryTime,
+                OtpTokenType = purpose,
+                Code = otpSecurity.Protect(user.Id, purpose, otpCode),
+                ExpiredAt = DateTime.UtcNow.AddSeconds(_otpSettings.ExpirationSeconds),
                 MaxAttempts = _otpSettings.MaxAttempts,
                 IsUsed = false,
                 CreatedAt = DateTime.UtcNow
-            };
-            await _unitOfWork.Repository<OtpToken>().InsertAsync(otpEntry, cancellationToken);
+            }, cancellationToken);
 
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Account created successfully with Id: {UserId}, Status: Pending", user.Id);
-
-            return TResult<CreateAccountResult>.Success(new CreateAccountResult
+            if (!isDevelopmentTestAccount)
             {
-                UserId = user.Id,
-                PhoneNumber = user.PhoneNumber,
-                Status = user.Status.ToString(),
-                TestOtp = _env.IsProduction() ? null : otpCode,
-                ExpiresIn = _otpSettings.ExpirationSeconds,
-                Message = MessageKey.RegisterSuccess
-            });
+                await smsSender.SendAsync(
+                    request.PhoneNumber,
+                    otpCode,
+                    Math.Max(1, (int)Math.Ceiling(_otpSettings.ExpirationSeconds / 60d)),
+                    cancellationToken);
+            }
+
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Authentication registration request accepted. UserId: {UserId}", user.Id);
+
+            return Accepted(otpSecurity.CanExposeDevelopmentOtp && isDevelopmentTestAccount ? otpCode : null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning("Registration dependency unavailable. Trace only; reason category: {Reason}", ex.GetType().Name);
+            return TResult<CreateAccountResult>.Failure(
+                MessageKey.AuthDependencyUnavailable,
+                ErrorCodes.SERVICE_UNAVAILABLE);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating account for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
+            logger.LogError("Registration request failed. ExceptionType: {ExceptionType}", ex.GetType().Name);
             return TResult<CreateAccountResult>.Failure(MessageKey.InternalError, ErrorCodes.SERVER_ERROR);
         }
     }
 
-    private static string GenerateOtpCode(int length)
-    {
-        var random = new Random();
-        var otp = string.Empty;
-        for (int i = 0; i < length; i++)
+    private TResult<CreateAccountResult> Accepted(string? developmentOtp) =>
+        TResult<CreateAccountResult>.Success(new CreateAccountResult
         {
-            otp += random.Next(0, 10).ToString();
-        }
-        return otp;
-    }
+            UserId = Guid.Empty,
+            Status = "Accepted",
+            TestOtp = developmentOtp,
+            ExpiresIn = _otpSettings.ExpirationSeconds,
+            Message = MessageKey.AuthRequestAccepted
+        });
 }
-

@@ -1,11 +1,11 @@
 ﻿using Ecom.Domain.Entities;
-using System.Linq.Expressions;
 namespace Ecom.Application.Features.Auth.Commands.DeleteAccount;
 
 [EnableUnitOfWork]
 public class DeleteAccountCommandHandler(
     IUnitOfWork unitOfWork,
-    ICurrentUser currentUser
+    ICurrentUser currentUser,
+    IOtpSecurityService otpSecurity
 ) : IRequestHandler<DeleteAccountCommand, TResult<string>>
 {
     public async Task<TResult<string>> Handle(DeleteAccountCommand request, CancellationToken ct)
@@ -25,20 +25,22 @@ public class DeleteAccountCommandHandler(
         if (!request.SelectedReasons.Any() && string.IsNullOrWhiteSpace(request.OtherReasonNote))
             return TResult<string>.Failure(MessageKey.DeletionReasonRequired, ErrorCodes.BAD_REQUEST);
         // 5.Kiểm tra OTP
-        bool isTestAccount = (request.PhoneNumber == TestAccounts.UnassignedUser || request.PhoneNumber == TestAccounts.Manager)
-                             && request.OtpCode == "0000";
+        bool isTestAccount = otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber)
+                             && string.Equals(request.OtpCode, otpSecurity.DevelopmentOtp, StringComparison.Ordinal);
 
         if (!isTestAccount)
         {
             var otp = await unitOfWork.Repository<OtpToken>().FindOneAsync(
-                filters: new Expression<Func<OtpToken, bool>>[] {
+                filters: [
                     o => o.UserId == user.Id,
-                    o => o.Code == request.OtpCode,
+                    o => o.OtpTokenType == OtpTokenTypeEnum.Login,
                     o => !o.IsUsed
-                }
+                ],
+                orderBy: "CreatedAt desc"
             );
 
-            if (otp == null || otp.IsExpired)
+            if (otp == null || otp.IsExpired || otp.IsLocked ||
+                !otpSecurity.Verify(user.Id, OtpTokenTypeEnum.Login, request.OtpCode, otp.Code))
                 return TResult<string>.Failure(MessageKey.OtpInvalidOrExpired, ErrorCodes.UNAUTHORIZED);
 
             otp.MarkAsUsed();

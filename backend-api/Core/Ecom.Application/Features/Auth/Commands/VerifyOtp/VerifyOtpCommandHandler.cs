@@ -11,43 +11,67 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 	private readonly IJwtTokenService _jwtTokenService;
 	private readonly ILogger<VerifyOtpCommandHandler> _logger;
 	private readonly OtpSettings _otpSettings;
+	private readonly IOtpSecurityService _otpSecurity;
+	private readonly IAuthTokenProtector _tokenProtector;
+	private readonly IAuthRateLimitService _rateLimiter;
 
 	public VerifyOtpCommandHandler(
 		IUnitOfWork unitOfWork,
 		IJwtTokenService jwtTokenService,
 		ILogger<VerifyOtpCommandHandler> logger,
-		IOptions<OtpSettings> otpOptions)
+		IOptions<OtpSettings> otpOptions,
+		IOtpSecurityService otpSecurity,
+		IAuthTokenProtector tokenProtector,
+		IAuthRateLimitService rateLimiter)
 	{
 		_unitOfWork = unitOfWork;
 		_jwtTokenService = jwtTokenService;
 		_logger = logger;
 		_otpSettings = otpOptions.Value;
+		_otpSecurity = otpSecurity;
+		_tokenProtector = tokenProtector;
+		_rateLimiter = rateLimiter;
 	}
 
 	public async Task<TResult<VerifyOtpResult>> Handle(VerifyOtpCommand request, CancellationToken cancellationToken)
 	{
-		_logger.LogInformation("Verifying OTP for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
-
 		try
 		{
 			var user = await GetUserAsync(request.PhoneNumber);
 			if (user == null || user.Id == Guid.Empty)
-				return TResult<VerifyOtpResult>.Failure(MessageKey.UserNotFound, ErrorCodes.NOT_FOUND);
+			{
+				var missingRateLimit = await _rateLimiter.AcquireAsync(
+					AuthRateLimitPolicyNames.OtpVerifyChallenge,
+					$"missing:{request.PhoneNumber}",
+					cancellationToken);
+				if (missingRateLimit.Status == AuthRateLimitStatus.Unavailable)
+					return TResult<VerifyOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
+				if (missingRateLimit.Status == AuthRateLimitStatus.Rejected)
+					return TResult<VerifyOtpResult>.Failure(MessageKey.TooManyRequests, ErrorCodes.TOO_MANY_REQUESTS);
+				return TResult<VerifyOtpResult>.Failure(MessageKey.AuthenticationFailed, ErrorCodes.UNAUTHORIZED);
+			}
 
 			if (IsUserLocked(user))
-				return TResult<VerifyOtpResult>.Failure(GetLockMessage(user), ErrorCodes.FORBIDDEN);
+				return TResult<VerifyOtpResult>.Failure(MessageKey.AuthenticationFailed, ErrorCodes.UNAUTHORIZED);
 
 			// Verify OTP
-			var isVerified = await VerifyOtpAsync(user, request);
-			if (!isVerified)
-				return TResult<VerifyOtpResult>.Failure(MessageKey.VerificationFailed, ErrorCodes.UNAUTHORIZED);
+			var verification = await VerifyOtpAsync(user, request, cancellationToken);
+			if (verification.RateLimitStatus == AuthRateLimitStatus.Unavailable)
+				return TResult<VerifyOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
+			if (verification.RateLimitStatus == AuthRateLimitStatus.Rejected)
+				return TResult<VerifyOtpResult>.Failure(MessageKey.TooManyRequests, ErrorCodes.TOO_MANY_REQUESTS);
+			if (!verification.IsVerified)
+				return TResult<VerifyOtpResult>.Failure(MessageKey.AuthenticationFailed, ErrorCodes.UNAUTHORIZED);
 
 			//  Update user state
 			bool isFirstTime = user.LastLoginAt == null;
 			UpdateUserAfterLogin(user);
 
 			if (user.Status == UserStatusEnum.Pending)
+			{
+				user.MarkPhoneVerified();
 				user.Activate();
+			}
 
 			user.MarkFirstLogin();
 			await _unitOfWork.Repository<User>().UpdateAsync(user);
@@ -69,12 +93,13 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 			await _unitOfWork.SaveChangesAsync(cancellationToken);
 
 			var loginStatus = ResolveLoginStatus(user, isFirstTime);
+			_logger.LogInformation("OTP login succeeded. UserId: {UserId}", user.Id);
 
 			return Success(user, loginStatus, accessToken, refreshToken, policies);
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, "Error verifying OTP for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
+			_logger.LogError("OTP verification failed unexpectedly. ExceptionType: {ExceptionType}", ex.GetType().Name);
 			return TResult<VerifyOtpResult>.Failure(MessageKey.InternalError, ErrorCodes.SERVER_ERROR);
 		}
 	}
@@ -94,18 +119,26 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 		return user.LockoutEnd.HasValue && user.LockoutEnd > DateTime.UtcNow;
 	}
 
-	private string GetLockMessage(User user)
+	private async Task<OtpVerificationAttempt> VerifyOtpAsync(
+		User user,
+		VerifyOtpCommand request,
+		CancellationToken cancellationToken)
 	{
-		var minutes = (int)(user.LockoutEnd!.Value - DateTime.UtcNow).TotalMinutes;
-		return string.Format(MessageKey.AccountLockedWithMinutes, minutes);
-	}
-
-	private async Task<bool> VerifyOtpAsync(User user, VerifyOtpCommand request)
-	{
-		//  Test account dùng OTP default
-		if (IsTestAccount(request.PhoneNumber))
+		// Fixed OTP is available only when both Development and the explicit option are active.
+		if (_otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber))
 		{
-			return request.OtpCode == _otpSettings.DefaultOtp;
+			var testRateLimit = await _rateLimiter.AcquireAsync(
+				AuthRateLimitPolicyNames.OtpVerifyChallenge,
+				$"{user.Id:N}:development",
+				cancellationToken);
+			return new OtpVerificationAttempt(_otpSecurity.Verify(
+				user.Id,
+				user.Status == UserStatusEnum.Pending ? OtpTokenTypeEnum.ActivateAccount : OtpTokenTypeEnum.Login,
+				request.OtpCode,
+				_otpSecurity.Protect(
+					user.Id,
+					user.Status == UserStatusEnum.Pending ? OtpTokenTypeEnum.ActivateAccount : OtpTokenTypeEnum.Login,
+					_otpSecurity.DevelopmentOtp)), testRateLimit.Status);
 		}
 
 		var inferredType = user.Status == UserStatusEnum.Pending
@@ -117,16 +150,26 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 				o => o.UserId == user.Id,
 				o => o.OtpTokenType == inferredType,
 				o => !o.IsUsed
-			]);
+			], orderBy: "CreatedAt desc");
+
+		var challengePartition = otp is null
+			? $"{user.Id:N}:no-challenge"
+			: $"{otp.Id:N}:{otp.Code}";
+		var rateLimit = await _rateLimiter.AcquireAsync(
+			AuthRateLimitPolicyNames.OtpVerifyChallenge,
+			challengePartition,
+			cancellationToken);
+		if (rateLimit.Status != AuthRateLimitStatus.Allowed)
+			return new OtpVerificationAttempt(false, rateLimit.Status);
 
 		if (otp == null || otp.IsExpired || otp.IsLocked)
-			return false;
+			return new OtpVerificationAttempt(false, AuthRateLimitStatus.Allowed);
 
-		if (otp.Code == request.OtpCode)
+		if (_otpSecurity.Verify(user.Id, inferredType, request.OtpCode, otp.Code))
 		{
 			otp.MarkAsUsed();
 			await _unitOfWork.Repository<OtpToken>().UpdateAsync(otp);
-			return true;
+			return new OtpVerificationAttempt(true, AuthRateLimitStatus.Allowed);
 		}
 
 		//  Sai OTP
@@ -143,14 +186,10 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 		await _unitOfWork.Repository<User>().UpdateAsync(user);
 		await _unitOfWork.SaveChangesAsync();
 
-		return false;
+		return new OtpVerificationAttempt(false, AuthRateLimitStatus.Allowed);
 	}
 
-	private bool IsTestAccount(string phone)
-	{
-		return phone == TestAccounts.Manager
-			|| phone == TestAccounts.UnassignedUser;
-	}
+	private sealed record OtpVerificationAttempt(bool IsVerified, AuthRateLimitStatus RateLimitStatus);
 
 	private void UpdateUserAfterLogin(User user)
 	{
@@ -176,7 +215,7 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 		var entity = new JwtRefreshToken
 		{
 			UserId = userId,
-			Token = token,
+			Token = _tokenProtector.Protect(token),
 			ExpiresAt = _jwtTokenService.GetRefreshTokenExpiration(),
 			CreatedAt = DateTime.UtcNow
 		};

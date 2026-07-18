@@ -23,11 +23,16 @@ public class JwtTokenService : IJwtTokenService
     private readonly SymmetricSecurityKey _signingKey;
     private readonly TokenValidationParameters _validationParameters;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuthTokenProtector _tokenProtector;
 
-    public JwtTokenService(IOptions<JwtSettings> settings, IUnitOfWork unitOfWork)
+    public JwtTokenService(
+        IOptions<JwtSettings> settings,
+        IUnitOfWork unitOfWork,
+        IAuthTokenProtector tokenProtector)
     {
         _settings = settings.Value;
         _unitOfWork = unitOfWork;
+        _tokenProtector = tokenProtector;
 
         // Validate secret key length (minimum 32 bytes for HS256)
         if (string.IsNullOrEmpty(_settings.SecretKey) || _settings.SecretKey.Length < 32)
@@ -54,6 +59,12 @@ public class JwtTokenService : IJwtTokenService
 
     /// <inheritdoc />
     public string GenerateAccessToken(User user, IEnumerable<string> policies)
+		=> GenerateAccessTokenCore(user, policies, null, null);
+
+	public string GenerateAccessToken(User user, IEnumerable<string> policies, Guid sessionId, string securityStamp)
+		=> GenerateAccessTokenCore(user, policies, sessionId, securityStamp);
+
+	private string GenerateAccessTokenCore(User user, IEnumerable<string> policies, Guid? sessionId, string? securityStamp)
     {
         var claims = new List<Claim>
         {
@@ -66,9 +77,12 @@ public class JwtTokenService : IJwtTokenService
             // Custom claims
             new("userId", user.Id.ToString()),
         };
+		if (sessionId.HasValue) claims.Add(new Claim("session_id", sessionId.Value.ToString()));
+		if (!string.IsNullOrEmpty(securityStamp)) claims.Add(new Claim("security_stamp", securityStamp));
+		if (!string.IsNullOrEmpty(user.Username)) claims.Add(new Claim("username", user.Username));
 
         // Add phone number if available
-        if (!string.IsNullOrEmpty(user.PhoneNumber))
+        if (!sessionId.HasValue && !string.IsNullOrEmpty(user.PhoneNumber))
         {
             claims.Add(new Claim("phone", user.PhoneNumber));
             claims.Add(new Claim(ClaimTypes.MobilePhone, user.PhoneNumber));
@@ -119,29 +133,47 @@ public class JwtTokenService : IJwtTokenService
     public async Task<TResult<RefreshTokenResult>> RefreshJwtToken(string refreshTokenId,
         CancellationToken cancellationToken)
     {
+        var protectedToken = _tokenProtector.Protect(refreshTokenId);
         // 1. Tìm Refresh Token trong Database
         var refreshToken = await _unitOfWork.Repository<JwtRefreshToken>()
-            .FindOneAsync(filters: [t => t.Token == refreshTokenId]);
+            .FindOneAsync(filters: [t => t.Token == protectedToken || t.Token == refreshTokenId]);
 
         if (refreshToken == null)
-            return TResult<RefreshTokenResult>.Failure("Refresh token không tồn tại", ErrorCodes.UNAUTHORIZED);
+            return TResult<RefreshTokenResult>.Failure(MessageKey.AuthenticationFailed, ErrorCodes.UNAUTHORIZED);
 
         // 2. Kiểm tra Token còn active không
         if (!refreshToken.IsActive)
-            return TResult<RefreshTokenResult>.Failure("Refresh token đã hết hạn hoặc bị thu hồi",
-                ErrorCodes.UNAUTHORIZED);
+        {
+            // Reuse of a rotated token invalidates every still-active session for this user.
+            if (refreshToken.IsRevoked && !string.IsNullOrWhiteSpace(refreshToken.ReplacedByToken))
+            {
+                var activeTokens = await _unitOfWork.Repository<JwtRefreshToken>()
+                    .FindAsync(filters: [t => t.UserId == refreshToken.UserId]);
+                foreach (var activeToken in activeTokens.Where(t => t.IsActive))
+                {
+                    activeToken.RevokedAt = DateTime.UtcNow;
+                    activeToken.Status = JwtRefreshTokenStatusEnum.Revoked;
+                    activeToken.RevokedReason = "RefreshTokenReuse";
+                    activeToken.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.Repository<JwtRefreshToken>().UpdateAsync(activeToken);
+                }
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+
+            return TResult<RefreshTokenResult>.Failure(MessageKey.AuthenticationFailed, ErrorCodes.UNAUTHORIZED);
+        }
 
         // 3. Lấy thông tin User
         var user = await _unitOfWork.Repository<User>().FindByIdAsync(refreshToken.UserId, u => u.Role!);
         if (user == null || user.Status != UserStatusEnum.Active)
-            return TResult<RefreshTokenResult>.Failure("Người dùng không tồn tại hoặc bị khóa", ErrorCodes.FORBIDDEN);
+            return TResult<RefreshTokenResult>.Failure(MessageKey.AuthenticationFailed, ErrorCodes.UNAUTHORIZED);
 
         // 4. Tạo Access Token mới
         // Bạn cần logic lấy Policies ở đây (giống như trong file cũ bạn gửi)
         var policies = await GetUserPoliciesAsync(user);
         var newAccessToken = GenerateAccessToken(user, policies);
 
-        var newRefreshTokenStr = refreshToken.Token;
+        var newRefreshTokenStr = refreshTokenId;
         var expiresAt = refreshToken.ExpiresAt;
 
         // 5. Token Rotation (Nếu bật)
@@ -153,13 +185,14 @@ public class JwtTokenService : IJwtTokenService
             // Vô hiệu hóa token cũ
             refreshToken.RevokedAt = DateTime.UtcNow;
             refreshToken.Status = JwtRefreshTokenStatusEnum.Revoked;
-            refreshToken.ReplacedByToken = newRefreshTokenStr;
+            var protectedNewRefreshToken = _tokenProtector.Protect(newRefreshTokenStr);
+            refreshToken.ReplacedByToken = protectedNewRefreshToken;
 
             // Tạo token mới lưu vào DB
             var newRefreshTokenEntity = new JwtRefreshToken
             {
                 UserId = user.Id,
-                Token = newRefreshTokenStr,
+                Token = protectedNewRefreshToken,
                 ExpiresAt = expiresAt,
                 Status = JwtRefreshTokenStatusEnum.Active,
                 CreatedAt = DateTime.UtcNow
@@ -180,8 +213,9 @@ public class JwtTokenService : IJwtTokenService
 
     public async Task<TResult> RevokeRefreshToken(string refreshTokenId, CancellationToken cancellationToken)
     {
+        var protectedToken = _tokenProtector.Protect(refreshTokenId);
         var refreshToken = await _unitOfWork.Repository<JwtRefreshToken>()
-            .FindOneAsync(filters: [t => t.Token == refreshTokenId]);
+            .FindOneAsync(filters: [t => t.Token == protectedToken || t.Token == refreshTokenId]);
 
         if (refreshToken != null && refreshToken.IsActive)
         {
@@ -264,7 +298,7 @@ public class JwtTokenService : IJwtTokenService
             return new JwtValidationResult
             {
                 IsValid = false,
-                ErrorMessage = $"Token validation failed: {ex.Message}"
+                ErrorMessage = $"Token validation failed: {ex.GetType().Name}"
             };
         }
         catch (Exception ex)
@@ -272,7 +306,7 @@ public class JwtTokenService : IJwtTokenService
             return new JwtValidationResult
             {
                 IsValid = false,
-                ErrorMessage = $"Unexpected error: {ex.Message}"
+                ErrorMessage = $"Unexpected token validation error: {ex.GetType().Name}"
             };
         }
     }

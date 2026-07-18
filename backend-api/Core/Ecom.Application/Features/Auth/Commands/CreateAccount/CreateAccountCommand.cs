@@ -4,6 +4,7 @@
 /// Command để đăng ký tài khoản mới bằng số điện thoại
 /// Sau đăng ký, user cần xác thực OTP để kích hoạt tài khoản
 /// </summary>
+[EnableUnitOfWork]
 public record CreateAccountCommand : IRequest<TResult<CreateAccountResult>>
 {
     /// <summary>

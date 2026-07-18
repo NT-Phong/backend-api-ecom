@@ -38,11 +38,11 @@ public class StructuredLoggingMiddleware
             
             // Add latency and error info to LogContext for enrichers to pick up
             using (LogContext.PushProperty("Latency", $"{elapsed}ms"))
-            using (LogContext.PushProperty("ErrorMessage", exception?.Message ?? ""))
+            using (LogContext.PushProperty("ExceptionType", exception?.GetType().Name ?? ""))
             {
                 if (exception != null)
                 {
-                    _logger.LogError(exception, "HTTP request failed");
+                    _logger.LogError("HTTP request failed. ExceptionType: {ExceptionType}", exception.GetType().Name);
                 }
                 else
                 {

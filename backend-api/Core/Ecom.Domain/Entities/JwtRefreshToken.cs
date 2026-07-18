@@ -9,7 +9,7 @@ public class JwtRefreshToken : BaseEntity
     #region Token Info
     
     /// <summary>
-    /// Refresh token value (unique)
+    /// One-way protected refresh-token lookup value (legacy rows may still be plaintext during dual-read cutover)
     /// </summary>
     public string Token { get; set; } = string.Empty;
     

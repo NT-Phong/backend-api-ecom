@@ -26,7 +26,7 @@ public class JwtSettings
     /// Thời gian sống của Access Token (phút)
     /// Default: 15 phút
     /// </summary>
-    public int AccessTokenExpirationMinutes { get; set; } = 15;
+    public int AccessTokenExpirationMinutes { get; set; } = 10;
     
     /// <summary>
     /// Thời gian sống của Refresh Token (ngày)

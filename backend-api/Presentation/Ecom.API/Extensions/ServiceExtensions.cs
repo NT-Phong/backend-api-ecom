@@ -2,6 +2,9 @@
 using System.Text.Json.Serialization;
 using Ecom.API.Serialization;
 using Microsoft.OpenApi.Models;
+using Ecom.Application.Common.Configuration;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 namespace Ecom.API.Extensions;
 
@@ -53,6 +56,11 @@ public static class ServiceExtensions
                        .AllowCredentials();
             });
         });
+        services.Configure<AuthResponseTimingOptions>(
+            configuration.GetSection(AuthResponseTimingOptions.SectionName));
+        services.AddAntiforgery(o => { o.HeaderName = "X-CSRF-TOKEN"; o.Cookie.Name = "__Host-ecom_csrf"; o.Cookie.SecurePolicy = CookieSecurePolicy.Always; o.Cookie.SameSite = SameSiteMode.Lax; });
+
+        AddAuthenticationRateLimiting(services, configuration);
 
         // Health checks
         var healthChecksBuilder = services.AddHealthChecks()
@@ -75,6 +83,46 @@ public static class ServiceExtensions
         }
 
         return services;
+    }
+
+    private static void AddAuthenticationRateLimiting(IServiceCollection services, IConfiguration configuration)
+    {
+        var settings = configuration.GetSection(AuthRateLimitOptions.SectionName)
+            .Get<AuthRateLimitOptions>() ?? new AuthRateLimitOptions();
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                context.HttpContext.Response.ContentType = "application/json";
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    context.HttpContext.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+
+                await context.HttpContext.Response.WriteAsJsonAsync(
+                    ApiResponse<object>.Fail(MessageKey.TooManyRequests, ErrorCodes.TOO_MANY_REQUESTS),
+                    cancellationToken);
+            };
+
+            AddIpPolicy(options, AuthRateLimitPolicyNames.RegisterIp, settings.RegisterIp);
+            AddIpPolicy(options, AuthRateLimitPolicyNames.OtpSendIp, settings.OtpSendIp);
+            AddIpPolicy(options, AuthRateLimitPolicyNames.OtpVerifyIp, settings.OtpVerifyIp);
+            AddIpPolicy(options, AuthRateLimitPolicyNames.RefreshIp, settings.RefreshIp);
+            AddIpPolicy(options, AuthRateLimitPolicyNames.PasswordLoginIp, settings.PasswordLoginIp);
+        });
+    }
+
+    private static void AddIpPolicy(RateLimiterOptions options, string name, RateLimitRule rule)
+    {
+        options.AddPolicy(name, httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, rule.PermitLimit),
+                Window = TimeSpan.FromSeconds(Math.Max(1, rule.WindowSeconds)),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
     }
     // Helper for Swagger
     public class SwaggerDefaultValues : IOperationFilter

@@ -23,7 +23,7 @@ public class OtpToken : BaseEntity
     #region OTP Info
     
     /// <summary>
-    /// Mã OTP (4 số)
+    /// Protected OTP verifier. Legacy rows may still contain the old plaintext code until rotated/expired.
     /// </summary>
     public string Code { get; set; } = string.Empty;
     

@@ -46,7 +46,7 @@ public class UpdateProfileCommandHandler : IRequestHandler<UpdateProfileCommand,
                 {
                     return TResult<UpdateProfileResult>.Failure(MessageKey.UserEmailAlreadyExists, ErrorCodes.ALREADY_EXISTS);
                 }
-                user.Email = request.Email.Trim();
+                user.SetEmail(request.Email);
             }
 
             if (request.Address != null)

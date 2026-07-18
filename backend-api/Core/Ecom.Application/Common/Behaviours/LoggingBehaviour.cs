@@ -51,9 +51,8 @@ public class LoggingBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest,
                 var duration = stopwatch.ElapsedMilliseconds;
                 var success = false;
                 
-                // END log with error details
-                _logger.LogError(ex, "[END] {RequestType} {RequestName} failed in {Duration}ms | Success: {Success} | User: {UserId} | Error: {ErrorMessage} | CorrelationId: {CorrelationId}", 
-                    requestType, requestName, duration, success, userId, ex.Message, correlationId);
+                _logger.LogError("[END] {RequestType} {RequestName} failed in {Duration}ms | Success: {Success} | User: {UserId} | ExceptionType: {ExceptionType} | CorrelationId: {CorrelationId}",
+                    requestType, requestName, duration, success, userId, ex.GetType().Name, correlationId);
                     
                 throw;
             }

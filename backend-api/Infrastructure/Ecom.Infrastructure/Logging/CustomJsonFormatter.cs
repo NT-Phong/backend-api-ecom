@@ -48,6 +48,12 @@ public class CustomJsonFormatter : ITextFormatter
         return new[]
         {
             @"token[=:\s]+[^\s&]+",
+            @"otp[=:\s]+[^\s&]+",
+            @"refresh[_-]?token[=:\s]+[^\s&]+",
+            @"authorization[_-]?code[=:\s]+[^\s&]+",
+            @"cookie[=:\s]+[^\s&]+",
+            @"phone(number)?[=:\s]+[^\s&]+",
+            @"email[=:\s]+[^\s&]+",
             @"api[_-]?key[=:\s]+[^\s&]+",
             @"password[=:\s]+[^\s&]+",
             @"secret[=:\s]+[^\s&]+",
@@ -87,9 +93,9 @@ public class CustomJsonFormatter : ITextFormatter
         WriteProperty(jsonWriter, "endpoint", GetPropertyValue(logEvent, "Endpoint"));
         WriteProperty(jsonWriter, "message", FilterSensitiveData(logEvent.RenderMessage()));
         //WriteProperty(jsonWriter, "error", FilterSensitiveData(GetPropertyValue(logEvent, "ErrorMessage")));
-        WriteProperty(jsonWriter, "error", logEvent.Exception?.Message);
+        WriteProperty(jsonWriter, "error", logEvent.Exception?.GetType().Name);
         WriteProperty(jsonWriter, "trace-id", GetPropertyValue(logEvent, "TraceId"));
-        WriteProperty(jsonWriter, "detail", logEvent.Exception?.ToString());
+        WriteProperty(jsonWriter, "detail", "");
 
 
         jsonWriter.WriteEndObject();

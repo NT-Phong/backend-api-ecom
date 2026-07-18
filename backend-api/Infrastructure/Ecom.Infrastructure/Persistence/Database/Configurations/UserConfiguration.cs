@@ -17,19 +17,24 @@ public class UserConfiguration : BaseEntityConfiguration<User>
 		// PhoneNumber - unique, required (dùng để đăng ký/đăng nhập)
 		builder.Property(u => u.PhoneNumber)
 			.HasMaxLength(20)
-			.IsRequired();
+			.IsRequired(false);
 
-		builder.HasIndex(u => u.PhoneNumber)
-			.IsUnique()
-			.HasFilter("\"IsDeleted\" = false");
+		builder.Property(u => u.NormalizedPhoneNumber).HasMaxLength(20);
+		builder.Property(u => u.Username).HasMaxLength(32);
+		builder.Property(u => u.NormalizedUsername).HasMaxLength(32);
+		builder.HasIndex(u => u.NormalizedUsername).IsUnique()
+			.HasFilter("\"NormalizedUsername\" IS NOT NULL AND \"IsDeleted\" = false");
+		builder.HasIndex(u => u.NormalizedPhoneNumber).IsUnique()
+			.HasFilter("\"NormalizedPhoneNumber\" IS NOT NULL AND \"IsDeleted\" = false");
 
 		// Email - unique, nullable
 		builder.Property(u => u.Email)
 			.HasMaxLength(255);
 
-		builder.HasIndex(u => u.Email)
-			.IsUnique()
-			.HasFilter("\"Email\" IS NOT NULL AND \"IsDeleted\" = false");
+		builder.Property(u => u.NormalizedEmail).HasMaxLength(255);
+		builder.Property(u => u.SecurityStamp).HasMaxLength(64).IsRequired();
+		builder.HasIndex(u => u.NormalizedEmail).IsUnique()
+			.HasFilter("\"NormalizedEmail\" IS NOT NULL AND \"IsDeleted\" = false");
 
 		// FullName
 		builder.Property(u => u.FullName)

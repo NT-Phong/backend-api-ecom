@@ -17,7 +17,7 @@ public class PasswordSettings
     /// <summary>
     /// Độ dài tối thiểu của mật khẩu
     /// </summary>
-    public int MinLength { get; set; } = 8;
+    public int MinLength { get; set; } = 15;
     
     /// <summary>
     /// Độ dài tối đa của mật khẩu (để tránh DoS attack với password dài)
@@ -27,22 +27,22 @@ public class PasswordSettings
     /// <summary>
     /// Yêu cầu có chữ hoa
     /// </summary>
-    public bool RequireUppercase { get; set; } = true;
+    public bool RequireUppercase { get; set; } = false;
     
     /// <summary>
     /// Yêu cầu có chữ thường
     /// </summary>
-    public bool RequireLowercase { get; set; } = true;
+    public bool RequireLowercase { get; set; } = false;
     
     /// <summary>
     /// Yêu cầu có số
     /// </summary>
-    public bool RequireDigit { get; set; } = true;
+    public bool RequireDigit { get; set; } = false;
     
     /// <summary>
     /// Yêu cầu có ký tự đặc biệt
     /// </summary>
-    public bool RequireSpecialCharacter { get; set; } = true;
+    public bool RequireSpecialCharacter { get; set; } = false;
     
     /// <summary>
     /// Danh sách ký tự đặc biệt được chấp nhận

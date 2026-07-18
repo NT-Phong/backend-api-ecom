@@ -59,6 +59,11 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RolePolicy> RolePolicies => Set<RolePolicy>();
     public DbSet<UserPolicy> UserPolicies => Set<UserPolicy>();
     public DbSet<UserDeviceToken> UserDeviceTokens => Set<UserDeviceToken>();
+    public DbSet<VerificationChallenge> VerificationChallenges => Set<VerificationChallenge>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<SessionRefreshToken> SessionRefreshTokens => Set<SessionRefreshToken>();
+    public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+    public DbSet<PasswordCredential> PasswordCredentials => Set<PasswordCredential>();
 
     // Commerce persistence schema. Application-facing abstractions remain unchanged until CQRS use cases require them.
     public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
@@ -149,6 +154,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             throw new InvalidOperationException("Cannot save changes on a read-only context");
         }
 
+        if (ChangeTracker.Entries<SecurityEvent>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Security events are append-only.");
         return await base.SaveChangesAsync(cancellationToken);
     }
 

@@ -14,12 +14,19 @@ public class User : BaseEntity
 	/// <summary>
 	/// Số điện thoại (unique, required - dùng để đăng ký/đăng nhập qua OTP)
 	/// </summary>
-	public string PhoneNumber { get; set; } = string.Empty;
+	public string? PhoneNumber { get; private set; }
+	public string? Username { get; private set; }
+	public string? NormalizedUsername { get; private set; }
+	public string? NormalizedPhoneNumber { get; private set; }
 
 	/// <summary>
 	/// Email (optional, có thể dùng để nhận thông báo)
 	/// </summary>
-	public string? Email { get; set; }
+	public string? Email { get; private set; }
+	public string? NormalizedEmail { get; private set; }
+	public string SecurityStamp { get; private set; } = Guid.NewGuid().ToString("N");
+	public DateTime? EmailVerifiedAt { get; private set; }
+	public DateTime? PhoneVerifiedAt { get; private set; }
 
 	/// <summary>
 	/// Số điện thoại đã được xác thực
@@ -131,19 +138,19 @@ public class User : BaseEntity
 
 	private User() { }
 
-	public User(string phoneNumber, Guid? roleId)
+	public User(string? phoneNumber, Guid? roleId)
 	{
-		PhoneNumber = phoneNumber;
+		SetPhoneNumber(phoneNumber);
 		RoleId = roleId;
 		Status = UserStatusEnum.Pending;
 		IsProfileCompleted = false;
 		PhoneNumberConfirmed = false;
 	}
 
-	public User(string fullName, string phoneNumber, Guid? roleId, ICollection<Guid>? zoneIds, UserStatusEnum status)
+	public User(string fullName, string? phoneNumber, Guid? roleId, ICollection<Guid>? zoneIds, UserStatusEnum status)
 	{
 		this.FullName = fullName;
-		this.PhoneNumber = phoneNumber;
+		SetPhoneNumber(phoneNumber);
 		this.RoleId = roleId;
 		this.ZoneIds = zoneIds ?? new List<Guid>();
 		this.Status = status;
@@ -160,14 +167,52 @@ public class User : BaseEntity
 
 	public void Activate()
 	{
+		if (PhoneVerifiedAt is null && EmailVerifiedAt is null)
+			throw new InvalidOperationException("An active user requires a verified contact or external identity.");
 		Status = UserStatusEnum.Active;
+	}
+
+	public void SetPhoneNumber(string? phoneNumber)
+	{
+		PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+		NormalizedPhoneNumber = PhoneNumber is null
+			? null
+			: new string(PhoneNumber.Where(char.IsDigit).ToArray());
+	}
+
+	public void SetEmail(string? email)
+	{
+		Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+		NormalizedEmail = Email?.ToUpperInvariant();
+	}
+
+	public void SetUsername(string username)
+	{
+		if (string.IsNullOrWhiteSpace(username)) throw new ArgumentException("Username is required.", nameof(username));
+		Username = username.Trim();
+		NormalizedUsername = Username.ToUpperInvariant();
+	}
+
+	public void MarkPhoneVerified(DateTime? occurredAt = null)
+	{
+		if (PhoneNumber is null) throw new InvalidOperationException("A phone number is required.");
+		PhoneVerifiedAt = occurredAt ?? DateTime.UtcNow;
 		PhoneNumberConfirmed = true;
 	}
+
+	public void MarkEmailVerified(DateTime? occurredAt = null)
+	{
+		if (Email is null) throw new InvalidOperationException("An email is required.");
+		EmailVerifiedAt = occurredAt ?? DateTime.UtcNow;
+		EmailConfirmed = true;
+	}
+
+	public void RotateSecurityStamp() => SecurityStamp = Guid.NewGuid().ToString("N");
 
 	public void CompleteProfile(string fullName, string? email, string? address, Guid? avatarId)
 	{
 		FullName = fullName;
-		Email = email;
+		SetEmail(email);
 		Address = address;
 		AvatarId = avatarId;
 		IsProfileCompleted = true;

@@ -15,7 +15,7 @@ Then choose one primary skill and only the references required by the current bo
 | --- | --- | --- |
 | Product, Variant, Price, Inventory, Cart, Checkout, Order, Payment, Shipment, TradeInquiry | `commerce-system` | Current status for progress; entity model for invariants; relational database for EF/schema; roadmap for sequencing |
 | Controller, MediatR, validation, authorization, UnitOfWork, errors, performance | `backend-api-architecture` | API checklist or dependency/security reference matching the question |
-| Auth, JWT, permissions, identity, secrets | `backend-api-architecture` | `.agents/context/risk-map.md` and the skill security reference |
+| Auth, JWT, password/session, roles, permissions, identity, secrets | `authentication` | `references/current-state.md`, `references/role-authorization.md`, `.agents/context/risk-map.md` |
 | EF migration, constraint, index, concurrency | `commerce-system` | Relational database, risk map, and commands |
 | Plan, specification, or handoff | Matching primary skill | `.agents/rules/spec-orchestrator.md` and task contract |
 | Independent code review | Matching primary skill | `.agents/templates/code-review.md` |

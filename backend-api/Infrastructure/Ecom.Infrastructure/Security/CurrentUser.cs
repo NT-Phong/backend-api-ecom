@@ -46,6 +46,8 @@ public class CurrentUser : ICurrentUser
 
     /// <inheritdoc />
     public IEnumerable<string> Policies => GetClaimValues("policy");
+    public Guid SessionId => Guid.TryParse(GetClaimValue("session_id"), out var value) ? value : Guid.Empty;
+    public string? SecurityStamp => GetClaimValue("security_stamp");
 
     /// <inheritdoc />
     public bool HasRole(string role)

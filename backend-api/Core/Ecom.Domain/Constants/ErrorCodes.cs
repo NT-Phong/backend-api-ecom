@@ -11,6 +11,7 @@ public enum ErrorCodes
     TIME_OUT = 408,
     ALREADY_EXISTS = 409,
     CHOOSE_ACCOUNT = 410,
+    TOO_MANY_REQUESTS = 429,
     UNPROCESSABLE_ENTITY = 422,
     INTERNAL_SERVER_ERROR = 500,
     SERVER_ERROR = 500,
@@ -25,6 +26,7 @@ public static class MessageKey
     public const string ValidationFailed = "Dữ liệu không hợp lệ.";
     public const string Unauthorized = "Bạn chưa đăng nhập.";
     public const string Forbidden = "Bạn không có quyền truy cập.";
+    public const string ResourceNotFound = "Không tìm thấy tài nguyên được yêu cầu.";
     #endregion
 
     #region User / Auth
@@ -56,6 +58,10 @@ public static class MessageKey
     public const string UserProfileUpdateFailed = "Không thể cập nhật thông tin cá nhân. Vui lòng thử lại.";
     public const string UserProfileCompleteSuccess = "Hoàn thiện thông tin cá nhân thành công.";
     public const string OtpSentSuccess = "OTP đã được gửi thành công đến số điện thoại của bạn.";
+    public const string AuthRequestAccepted = "Nếu thông tin hợp lệ, hướng dẫn xác thực sẽ được gửi.";
+    public const string AuthenticationFailed = "Thông tin xác thực không hợp lệ.";
+    public const string TooManyRequests = "Bạn đã thực hiện quá nhiều yêu cầu. Vui lòng thử lại sau.";
+    public const string AuthDependencyUnavailable = "Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.";
     public const string OtpNotTrue = "OTP không đúng cho tài khoản Test. Vui lòng thử lại.";
     public const string RoleNotFound = "Không tìm thấy vai trò (Role).";
     public const string UpdateRoleSuccess = "Cập nhật quyền hạn thành công.";

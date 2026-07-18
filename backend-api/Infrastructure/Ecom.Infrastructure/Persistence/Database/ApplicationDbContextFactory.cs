@@ -80,6 +80,8 @@ internal class DesignTimeCurrentUser : ICurrentUser
     public string? Role { get; }
     public IEnumerable<string> Roles => [];
     public IEnumerable<string> Policies { get; } = [];
+    public Guid SessionId => Guid.Empty;
+    public string? SecurityStamp => null;
 
     public bool HasRole(string role)
     {

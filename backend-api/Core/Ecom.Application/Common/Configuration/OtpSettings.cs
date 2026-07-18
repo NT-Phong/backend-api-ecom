@@ -30,5 +30,18 @@ public class OtpSettings
     public string? TemplateIdVina { get; set; }
     public string TestPhoneNumber { get; set; } = string.Empty;
     public string DefaultOtp { get; set; } = "0000";
+    /// <summary>
+    /// Keyed HMAC secret used to protect OTP values at rest. Supply from a secret store outside Development.
+    /// </summary>
+    public string HashKey { get; set; } = string.Empty;
+    /// <summary>
+    /// Enables the fixed development OTP for the configured legacy test accounts.
+    /// This option is rejected outside the Development environment.
+    /// </summary>
+    public bool EnableDevelopmentTestAccounts { get; set; }
+    /// <summary>
+    /// Allows returning a development OTP in the existing V1 DTO. Rejected outside Development.
+    /// </summary>
+    public bool ExposeDevelopmentOtp { get; set; }
 }
 

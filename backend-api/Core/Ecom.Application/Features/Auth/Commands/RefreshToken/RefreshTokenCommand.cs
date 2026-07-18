@@ -1,5 +1,6 @@
 ﻿namespace Ecom.Application.Features.Auth.Commands.RefreshToken;
 
+[EnableUnitOfWork]
 public record RefreshTokenCommand : IRequest<TResult<RefreshTokenResult>>
 {
     public string RefreshToken { get; set; } = string.Empty;

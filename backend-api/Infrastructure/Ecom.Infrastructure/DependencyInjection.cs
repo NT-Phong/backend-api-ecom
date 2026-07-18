@@ -1,6 +1,7 @@
 using Ecom.Application.Common.Configuration;
 using Ecom.Application.Common.Interfaces;
 using Ecom.Domain.Interfaces;
+using Ecom.Domain.Enums;
 using Ecom.Infrastructure.HealthChecks;
 using Ecom.Infrastructure.Persistence.Database;
 using Ecom.Infrastructure.Persistence.Database.Interceptors;
@@ -10,6 +11,7 @@ using Ecom.Infrastructure.Locking;
 using Ecom.Infrastructure.Services;
 using Ecom.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -19,6 +21,9 @@ using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
+using Ecom.Infrastructure.Services.Sms;
 
 namespace Ecom.Infrastructure;
 
@@ -31,6 +36,21 @@ public static class DependencyInjection
         services.Configure<ConnectionSettings>(configuration.GetSection(ConnectionSettings.SectionName));
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<OtpSettings>(configuration.GetSection(OtpSettings.SectionName));
+        services.Configure<AuthRateLimitOptions>(configuration.GetSection(AuthRateLimitOptions.SectionName));
+        services.Configure<PasswordSettings>(configuration.GetSection(PasswordSettings.SectionName));
+        services.Configure<EmailVerificationOptions>(configuration.GetSection(EmailVerificationOptions.SectionName));
+        services.AddSingleton<IValidateOptions<PasswordAuthenticationV2Options>, PasswordAuthenticationV2OptionsValidator>();
+        services.AddOptions<PasswordAuthenticationV2Options>()
+            .Bind(configuration.GetSection(PasswordAuthenticationV2Options.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<OtpSettings>, OtpSettingsValidator>();
+        services.AddSingleton<IValidateOptions<PasswordSettings>, PasswordSettingsValidator>();
+        services.AddOptions<OtpSettings>()
+            .Bind(configuration.GetSection(OtpSettings.SectionName))
+            .ValidateOnStart();
+        services.AddOptions<PasswordSettings>()
+            .Bind(configuration.GetSection(PasswordSettings.SectionName))
+            .ValidateOnStart();
 
         // Register OpenTelemetry
         services.AddOpenTelemetryServices(configuration);
@@ -82,6 +102,11 @@ public static class DependencyInjection
 
         // Authentication & Security Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddSingleton<IOtpSecurityService, OtpSecurityService>();
+        services.AddSingleton<IAuthTokenProtector, AuthTokenProtector>();
+        services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
+        services.AddScoped<ISessionRefreshService, SessionRefreshService>();
+        services.AddSingleton<ISmsSender, SmsSender>();
 
         #region JwtSettings
 
@@ -92,9 +117,29 @@ public static class DependencyInjection
         {
             services.AddAuthentication(options =>
                 {
-                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-                    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultAuthenticateScheme = "ecom-auth";
+                    options.DefaultChallengeScheme = "ecom-auth";
+                    options.DefaultScheme = "ecom-auth";
+                })
+                .AddPolicyScheme("ecom-auth", "JWT or session cookie", options => options.ForwardDefaultSelector = context =>
+                    context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                        ? JwtBearerDefaults.AuthenticationScheme : CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.Cookie.Name = "__Host-ecom_session"; options.Cookie.HttpOnly = true; options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.Cookie.SameSite = SameSiteMode.Lax; options.Cookie.Path = "/"; options.SlidingExpiration = false;
+                    options.Events.OnValidatePrincipal = async context =>
+                    {
+                        var sid = context.Principal?.FindFirst("session_id")?.Value;
+                        var uid = context.Principal?.FindFirst("userId")?.Value;
+                        if (!Guid.TryParse(sid,out var sessionId) || !Guid.TryParse(uid,out var userId)) { context.RejectPrincipal(); return; }
+                        var db=context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>(); var now=DateTime.UtcNow;
+                        var user=await db.Users.AsNoTracking().FirstOrDefaultAsync(x=>x.Id==userId,context.HttpContext.RequestAborted);
+                        var session=await db.UserSessions.AsNoTracking().FirstOrDefaultAsync(x=>x.Id==sessionId && x.UserId==userId,context.HttpContext.RequestAborted);
+                        if(user is null || session is null || user.Status!=UserStatusEnum.Active || !session.IsActive(now,user.SecurityStamp)) context.RejectPrincipal();
+                    };
+                    options.Events.OnRedirectToLogin = c => { c.Response.StatusCode=StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
+                    options.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode=StatusCodes.Status403Forbidden; return Task.CompletedTask; };
                 })
                 .AddJwtBearer(options =>
                 {
@@ -120,6 +165,27 @@ public static class DependencyInjection
                             }
 
                             return Task.CompletedTask;
+                        },
+
+                        OnChallenge = async context =>
+                        {
+                            if (context.Response.HasStarted) return;
+                            context.HandleResponse();
+                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                            context.Response.ContentType = "application/json";
+                            await context.Response.WriteAsJsonAsync(
+                                ApiResponse<object>.Fail(MessageKey.Unauthorized, ErrorCodes.UNAUTHORIZED),
+                                context.HttpContext.RequestAborted);
+                        },
+
+                        OnForbidden = async context =>
+                        {
+                            if (context.Response.HasStarted) return;
+                            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                            context.Response.ContentType = "application/json";
+                            await context.Response.WriteAsJsonAsync(
+                                ApiResponse<object>.Fail(MessageKey.Forbidden, ErrorCodes.FORBIDDEN),
+                                context.HttpContext.RequestAborted);
                         },
 
                         OnMessageReceived = context =>
@@ -178,11 +244,14 @@ public static class DependencyInjection
             });
 
             services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
+            services.AddSingleton<IAuthRateLimitCounterStore, RedisAuthRateLimitCounterStore>();
+            services.AddSingleton<IAuthRateLimitService, DistributedAuthRateLimitService>();
         }
         else
         {
             services.AddDistributedMemoryCache();
             services.AddSingleton<IDistributedLockService, InMemoryDistributedLockService>();
+            services.AddSingleton<IAuthRateLimitService, UnavailableAuthRateLimitService>();
         }
 
         services.AddScoped<IDistributedCacheService, DistributedCacheService>();

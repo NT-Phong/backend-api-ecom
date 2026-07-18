@@ -15,6 +15,7 @@ public interface IJwtTokenService
     /// <param name="policies">Danh sách policies của user (đã tính toán từ Role + UserPolicy)</param>
     /// <returns>JWT Access Token string</returns>
     string GenerateAccessToken(User user, IEnumerable<string> policies);
+    string GenerateAccessToken(User user, IEnumerable<string> policies, Guid sessionId, string securityStamp);
     
     /// <summary>
     /// Tạo Refresh Token

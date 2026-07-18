@@ -1,160 +1,130 @@
-﻿using Ecom.Application.Common.Configuration;
+using Ecom.Application.Common.Configuration;
 using Ecom.Domain.Entities;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Ecom.Application.Features.Auth.Commands.SendOtp;
 
-/// <summary>
-/// Handler gửi OTP đến số điện thoại
-/// </summary>
 [EnableUnitOfWork]
-public class SendOtpCommandHandler : IRequestHandler<SendOtpCommand, TResult<SendOtpResult>>
+public class SendOtpCommandHandler(
+    IUnitOfWork unitOfWork,
+    ILogger<SendOtpCommandHandler> logger,
+    IOptions<OtpSettings> otpOptions,
+    IOtpSecurityService otpSecurity,
+    ISmsSender smsSender,
+    IAuthRateLimitService rateLimiter)
+    : IRequestHandler<SendOtpCommand, TResult<SendOtpResult>>
 {
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogger<SendOtpCommandHandler> _logger;
-    private readonly OtpSettings _otpSettings;
-    private readonly IHostEnvironment _env;
-
-    public SendOtpCommandHandler(
-        IUnitOfWork unitOfWork,
-        ILogger<SendOtpCommandHandler> logger,
-        IOptions<OtpSettings> otpSettings,
-        IHostEnvironment env)
-    {
-        _unitOfWork = unitOfWork;
-        _logger = logger;
-        _otpSettings = otpSettings.Value;
-        _env = env;
-    }
+    private readonly OtpSettings _otpSettings = otpOptions.Value;
 
     public async Task<TResult<SendOtpResult>> Handle(SendOtpCommand request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.PhoneNumber))
-        {
             return TResult<SendOtpResult>.Failure(MessageKey.PhoneNumberRequired, ErrorCodes.BAD_REQUEST);
+
+        foreach (var policy in new[]
+                 {
+                     AuthRateLimitPolicyNames.OtpSendDestinationBurst,
+                     AuthRateLimitPolicyNames.OtpSendDestinationDaily
+                 })
+        {
+            var rateLimit = await rateLimiter.AcquireAsync(policy, request.PhoneNumber, cancellationToken);
+            if (rateLimit.Status == AuthRateLimitStatus.Unavailable)
+                return TResult<SendOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
+            if (rateLimit.Status == AuthRateLimitStatus.Rejected)
+                return TResult<SendOtpResult>.Failure(MessageKey.TooManyRequests, ErrorCodes.TOO_MANY_REQUESTS);
         }
+        if (!smsSender.IsConfigured && !otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber))
+            return TResult<SendOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
+
         try
         {
-            // 1. TÌM USER
-            var user = await _unitOfWork.Repository<User>()
+            var user = await unitOfWork.Repository<User>()
                 .FindOneAsync(filters: [u => u.PhoneNumber == request.PhoneNumber], includes: [u => u.Role!]);
 
-            if (user == null)
-            {
-                return TResult<SendOtpResult>.Failure(MessageKey.PhoneNumberNotFound, ErrorCodes.NOT_FOUND);
-            }
+            // Keep the public result neutral for missing or disabled accounts.
+            if (user is null || user.Status == UserStatusEnum.Deactivated)
+                return Accepted();
 
-            if (user.Status == UserStatusEnum.Deactivated)
-            {
-                return TResult<SendOtpResult>.Failure(MessageKey.UserAccountDisabled, ErrorCodes.FORBIDDEN);
-            }
-
-            bool isTestAccount = IsDevTestAccount(request.PhoneNumber, _env);
-
-            string otpCode = isTestAccount
-                ? _otpSettings.DefaultOtp
-                : GenerateOtpCode(_otpSettings.OtpLength);
-
-            var inferredType = user.Status == UserStatusEnum.Pending
+            var purpose = user.Status == UserStatusEnum.Pending
                 ? OtpTokenTypeEnum.ActivateAccount
                 : OtpTokenTypeEnum.Login;
             var now = DateTime.UtcNow;
+            var existingOtp = await unitOfWork.Repository<OtpToken>().FindOneAsync(filters:
+            [
+                o => o.UserId == user.Id,
+                o => o.OtpTokenType == purpose,
+                o => !o.IsUsed
+            ], orderBy: "CreatedAt desc");
 
-            // 2. Nếu otp cũ còn hạn thì -> trả về luôn
-            var existingOtp = await _unitOfWork.Repository<OtpToken>().FindOneAsync(filters: [
-                o => o.UserId == user.Id
-            ]);
-
-            if (user.Status == UserStatusEnum.Pending && existingOtp != null && !existingOtp.IsUsed && existingOtp.ExpiredAt > now)
+            var lastSent = existingOtp?.UpdatedAt ?? existingOtp?.CreatedAt;
+            if (lastSent.HasValue &&
+                lastSent.Value.AddSeconds(_otpSettings.ResendCooldownSeconds) > now)
             {
-                return TResult<SendOtpResult>.Success(new SendOtpResult
-                {
-                    Status = "ResendCooldown",
-                    IsPending = true,
-                    OtpCode = !_env.IsProduction() ? existingOtp.Code : null,
-                    ExpiresInSeconds = (int)(existingOtp.ExpiredAt - now).TotalSeconds,
-                    Message = MessageKey.UserNotActive
-                });
+                return Accepted();
             }
 
-            var lastTimeSent = existingOtp?.UpdatedAt ?? existingOtp?.CreatedAt;
-            if (lastTimeSent.HasValue && lastTimeSent.Value.AddSeconds(_otpSettings.ResendCooldownSeconds) > now)
-            {
-                var wait = (int)(lastTimeSent.Value.AddSeconds(_otpSettings.ResendCooldownSeconds) - now).TotalSeconds;
-                var errorMessage = string.Format(MessageKey.OtpResendWait, wait);
-                return TResult<SendOtpResult>.Failure(errorMessage, ErrorCodes.BAD_REQUEST);
-            }
+            var isDevelopmentTestAccount = otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber);
+            var otpCode = isDevelopmentTestAccount
+                ? otpSecurity.DevelopmentOtp
+                : otpSecurity.GenerateCode();
+            var protectedCode = otpSecurity.Protect(user.Id, purpose, otpCode);
 
-            // 3. SINH MÃ MỚI & XỬ LÝ DATABASE (CẬP NHẬT HOẶC THÊM MỚI)
-            int expirationSeconds = isTestAccount ? (int)TimeSpan.FromDays(365).TotalSeconds : _otpSettings.ExpirationSeconds;
-            int maxAttempts = isTestAccount ? 999 : _otpSettings.MaxAttempts;
-
-            if (existingOtp != null)
+            if (existingOtp is not null)
             {
-                existingOtp.UpdateNewCode(otpCode, expirationSeconds, maxAttempts);
-                existingOtp.OtpTokenType = inferredType;
-                await _unitOfWork.Repository<OtpToken>().UpdateAsync(existingOtp);
+                existingOtp.UpdateNewCode(protectedCode, _otpSettings.ExpirationSeconds, _otpSettings.MaxAttempts);
+                existingOtp.OtpTokenType = purpose;
+                await unitOfWork.Repository<OtpToken>().UpdateAsync(existingOtp);
             }
             else
             {
-                var newOtp = new OtpToken
+                await unitOfWork.Repository<OtpToken>().InsertAsync(new OtpToken
                 {
                     UserId = user.Id,
-                    Code = otpCode,
-                    OtpTokenType = inferredType,
+                    Code = protectedCode,
+                    OtpTokenType = purpose,
                     PhoneNumber = request.PhoneNumber,
-                    ExpiredAt = DateTime.UtcNow.AddSeconds(expirationSeconds),
-                    MaxAttempts = maxAttempts,
+                    ExpiredAt = now.AddSeconds(_otpSettings.ExpirationSeconds),
+                    MaxAttempts = _otpSettings.MaxAttempts,
                     IsUsed = false,
-                    CreatedAt = DateTime.UtcNow
-                };
-                await _unitOfWork.Repository<OtpToken>().InsertAsync(newOtp, cancellationToken);
+                    CreatedAt = now
+                }, cancellationToken);
             }
 
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-            // Log the OTP code for local environment verification
-            _logger.LogInformation("--- [OTP VERIFICATION CODE] For PhoneNumber {Phone}: {OtpCode} ---", request.PhoneNumber, otpCode);
-
-            // 5. TRẢ VỀ KẾT QUẢ
-            bool isPending = user.Status == UserStatusEnum.Pending && !isTestAccount;
-            var result = new SendOtpResult
+            if (!isDevelopmentTestAccount)
             {
-                ExpiresInSeconds = _otpSettings.ExpirationSeconds,
-                CanResendAt = now.AddSeconds(_otpSettings.ResendCooldownSeconds),
-                IsPending = isPending,
-                Status = isPending ? "Unverified" : "Completed",
-                OtpCode = otpCode,
-                Message = isPending
-                    ? MessageKey.UserNotActive
-                    : MessageKey.OtpSentSuccess
-            };
+                await smsSender.SendAsync(
+                    request.PhoneNumber,
+                    otpCode,
+                    Math.Max(1, (int)Math.Ceiling(_otpSettings.ExpirationSeconds / 60d)),
+                    cancellationToken);
+            }
 
-            return TResult<SendOtpResult>.Success(result);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("OTP request accepted. UserId: {UserId}, Purpose: {Purpose}", user.Id, purpose);
+
+            return Accepted(otpSecurity.CanExposeDevelopmentOtp && isDevelopmentTestAccount ? otpCode : null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning("OTP delivery dependency unavailable. Reason category: {Reason}", ex.GetType().Name);
+            return TResult<SendOtpResult>.Failure(
+                MessageKey.AuthDependencyUnavailable,
+                ErrorCodes.SERVICE_UNAVAILABLE);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error sending OTP to PhoneNumber: {PhoneNumber}", request.PhoneNumber);
+            logger.LogError("OTP request failed. ExceptionType: {ExceptionType}", ex.GetType().Name);
             return TResult<SendOtpResult>.Failure(MessageKey.InternalError, ErrorCodes.SERVER_ERROR);
         }
     }
 
-    private static bool IsDevTestAccount(string phoneNumber, IHostEnvironment env)
-    {
-        return (env.IsDevelopment() || env.IsStaging()) &&
-               TestAccounts.All.Contains(phoneNumber);
-    }
-
-    private static string GenerateOtpCode(int length)
-    {
-        var random = new Random();
-        var otp = string.Empty;
-        for (int i = 0; i < length; i++)
+    private TResult<SendOtpResult> Accepted(string? developmentOtp = null) =>
+        TResult<SendOtpResult>.Success(new SendOtpResult
         {
-            otp += random.Next(0, 10).ToString();
-        }
-        return otp;
-    }
+            ExpiresInSeconds = _otpSettings.ExpirationSeconds,
+            CanResendAt = DateTime.UtcNow.AddSeconds(_otpSettings.ResendCooldownSeconds),
+            OtpCode = developmentOtp,
+            Message = MessageKey.AuthRequestAccepted,
+            Status = "Accepted"
+        });
 }
-

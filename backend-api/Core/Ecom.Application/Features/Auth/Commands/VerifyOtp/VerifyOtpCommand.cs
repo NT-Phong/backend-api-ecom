@@ -3,6 +3,7 @@
 /// <summary>
 /// Command xác thực OTP và đăng nhập
 /// </summary>
+[EnableUnitOfWork]
 public record VerifyOtpCommand : IRequest<TResult<VerifyOtpResult>>
 {
     /// <summary>

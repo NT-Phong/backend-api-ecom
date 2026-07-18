@@ -18,6 +18,8 @@ using Ecom.Application.Features.Auth.Queries.GetCurrentUser;
 using Ecom.Application.Features.Auth.Queries.GetRoles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
+using Ecom.Application.Common.Configuration;
 
 namespace Ecom.API.Controllers;
 
@@ -44,13 +46,14 @@ public class AuthController : BaseController
     /// <returns>Thông tin tài khoản đã tạo</returns>
     [HttpPost("register")]
     [AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicyNames.RegisterIp)]
     [ProducesResponseType(typeof(ApiResponse<CreateAccountResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register(
         [FromBody] CreateAccountCommand command,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Register request for Phone: {PhoneNumber}", command.PhoneNumber);
+        _logger.LogInformation("Register request received");
 
         var result = await Mediator.Send(command, cancellationToken);
         return HandleResult(result);
@@ -65,14 +68,14 @@ public class AuthController : BaseController
     /// <returns>Thông tin OTP đã gửi</returns>
     [HttpPost("send-otp")]
     [AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicyNames.OtpSendIp)]
     [ProducesResponseType(typeof(ApiResponse<SendOtpResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SendOtp(
         [FromBody] SendOtpCommand command,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("SendOtp request for Phone: {PhoneNumber}", 
-            command.PhoneNumber);
+        _logger.LogInformation("SendOtp request received");
 
         var result = await Mediator.Send(command, cancellationToken);
         return HandleResult(result);
@@ -87,6 +90,7 @@ public class AuthController : BaseController
     /// <returns>Access Token và Refresh Token</returns>
     [HttpPost("verify-otp")]
     [AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicyNames.OtpVerifyIp)]
     [ProducesResponseType(typeof(ApiResponse<VerifyOtpResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
@@ -94,8 +98,7 @@ public class AuthController : BaseController
         [FromBody] VerifyOtpCommand command,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("VerifyOtp request for Phone: {PhoneNumber}", 
-            command.PhoneNumber);
+        _logger.LogInformation("VerifyOtp request received");
 
         var result = await Mediator.Send(command, cancellationToken);
         return HandleResult(result);
@@ -132,6 +135,7 @@ public class AuthController : BaseController
     /// <returns>Access Token mới và Refresh Token mới (nếu enable rotation)</returns>
     [HttpPost("refresh-token")]
     [AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicyNames.RefreshIp)]
     [ProducesResponseType(typeof(ApiResponse<RefreshTokenResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> RefreshToken(

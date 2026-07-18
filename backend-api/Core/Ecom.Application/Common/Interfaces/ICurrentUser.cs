@@ -41,6 +41,8 @@ public interface ICurrentUser
     /// Danh sách policies/permissions
     /// </summary>
     IEnumerable<string> Policies { get; }
+    Guid SessionId { get; }
+    string? SecurityStamp { get; }
     
     /// <summary>
     /// Kiểm tra user có role hay không
