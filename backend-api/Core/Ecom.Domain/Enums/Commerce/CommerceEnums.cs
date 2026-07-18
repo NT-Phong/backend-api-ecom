@@ -18,12 +18,12 @@ public enum CouponStatus { Draft, Active, Paused, Expired }
 public enum InventoryReservationStatus { Active, Consumed, Released, Expired }
 public enum InventoryMovementType { Receive, Allocate, Release, Adjust, Ship, Return }
 public enum CartStatus { Active, Converted, Expired }
-public enum OrderStatus { Pending, Confirmed, Processing, Shipped, Delivered, Cancelled, Refunded }
+public enum OrderStatus { Pending, Confirmed, Preparing, Shipping, Completed, Cancelled, DeliveryFailed }
 public enum OrderNoteType { Internal, Customer, System }
 public enum PaymentMethod { COD, BankTransfer, Gateway }
-public enum PaymentStatus { Pending, Authorized, Paid, Failed, Refunded }
+public enum PaymentStatus { Pending, AwaitingConfirmation, Paid, Failed, Refunded, Cancelled }
 public enum PaymentTransactionType { Initiate, Capture, Verify, Refund }
-public enum ShipmentStatus { Pending, Ready, Shipped, Delivered, Failed }
+public enum ShipmentStatus { Pending, Ready, Shipping, Delivered, DeliveryFailed, Cancelled }
 public enum CertificationVerificationStatus { Pending, Verified, Rejected, Expired }
 public enum CertificationEvidenceType { Certificate, SupportingDocument, Other }
 public enum TraceLotStatus { Draft, Active, Expired, Recalled }
@@ -33,7 +33,7 @@ public enum AnswerStatus { Draft, Published, Hidden }
 public enum NewsletterStatus { Pending, Subscribed, Unsubscribed }
 public enum ContentStatus { Draft, Published, Hidden, Archived }
 public enum TradeInquiryType { BulkPurchase, Agency, Partnership }
-public enum TradeInquiryStatus { New, InProgress, Qualified, Closed, Rejected }
+public enum TradeInquiryStatus { New, Assigned, InProgress, Quoted, Won, Lost, Closed }
 public enum PartnerApplicationType { Agency, Distributor, Partnership }
 public enum PartnerApplicationStatus { New, Reviewing, Approved, Rejected, Closed }
 public enum NotificationDeliveryStatus { Pending, Delivered, Failed, Read }

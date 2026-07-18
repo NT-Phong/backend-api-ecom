@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ecom.Application.Common.Interfaces;
 using Ecom.Domain.Entities;
+using Ecom.Infrastructure.Persistence.Outbox;
 
 namespace Ecom.Infrastructure.Persistence.Database;
 
@@ -139,6 +140,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<VisitorSession> VisitorSessions => Set<VisitorSession>();
     public DbSet<AnalyticsEvent> AnalyticsEvents => Set<AnalyticsEvent>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

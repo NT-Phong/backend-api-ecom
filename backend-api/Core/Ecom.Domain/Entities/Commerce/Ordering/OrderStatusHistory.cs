@@ -8,6 +8,17 @@ public class OrderStatusHistory : BaseEntity
     public Guid? ChangedByUserId { get; private set; }
     public DateTime ChangedAt { get; private set; }
 
+    internal static OrderStatusHistory Create(Guid orderId, OrderStatus? from, OrderStatus to, string? reason, Guid? actorId, DateTime changedAt) =>
+        new()
+        {
+            OrderId = orderId,
+            FromStatus = from,
+            ToStatus = to,
+            Reason = reason?.Trim(),
+            ChangedByUserId = actorId,
+            ChangedAt = changedAt
+        };
+
     private OrderStatusHistory()
     {
     }

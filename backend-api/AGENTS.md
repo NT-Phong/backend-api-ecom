@@ -1,123 +1,68 @@
-﻿# AGENTS.md
+# AGENTS.md
 
 ## Purpose
 
-Guide AI coding agents working on the Ecom backend API safely and efficiently. This file is the bootstrap only; keep detailed routing, prior investigations, examples, and scripts under `.agents/`.
+Guide agents building the Thanh Hoa Commerce backend API. Detailed routing lives under `.agents/`; this file is the bootstrap.
 
-## Project Model
+## Project Direction
 
-Ecom is a .NET backend API for aquaculture operations: ponds, zones, seasons, warehouse flows, IoT devices, telemetry, realtime scale weighing, notifications, reports, and camera/media integrations.
+The target product is a public commerce platform for local products with catalog, producer profiles, trust/traceability, cart, checkout, orders, payment, shipment, CMS, engagement, B2B inquiries, reporting, and administration.
 
-Architecture is pragmatic Clean Architecture with CQRS and MediatR:
+The repository still contains legacy aquaculture/IoT modules. Treat them as existing source, not as the direction for new work. Do not extend those modules unless the user explicitly reopens that scope.
+
+Architecture remains pragmatic Clean Architecture with CQRS/MediatR:
 
 ```text
 Presentation -> Application -> Domain
 Infrastructure -> Application/Domain abstractions
 ```
 
-- `Presentation/Ecom.API`: controllers, SignalR hubs, middleware, Swagger/ReDoc, health checks, runtime setup.
-- `Core/Ecom.Application`: CQRS features, MediatR handlers, validators, DTOs, services, abstractions.
-- `Core/Ecom.Domain`: entities, invariants, constants, messages, domain events, contracts.
-- `Infrastructure/Ecom.Infrastructure`: EF Core/PostgreSQL, UnitOfWork/repositories, Redis, IoT, messaging, FCM, security, camera/media, workers.
+## Startup
 
-Application may pragmatically reference EF Core abstractions, ASP.NET Core `IFormFile`, cache, SignalR, and IoT abstractions. Do not "purify" this unless explicitly asked.
+1. Read `.agents/context/task-router.md`.
+2. Select one primary skill from the router.
+3. Load only the reference matching the current task boundary.
+4. Use `.agents/context/quick-scan.md` when starting from a route, entity, error, or feature name.
+5. Reuse already-loaded stable context during the same task.
 
-## Context Budget Rules
+## Workflow
 
-If these rules are already configured in the agent tool, do not ask the user to paste or resend an initialization prompt. Start from the task and load only the smallest task-specific context.
+1. Classify: design, debugging, refactoring, review, or implementation.
+2. Bound the task to route/controller, request, handler, aggregate, repository/query, configuration, or integration.
+3. Search before opening files and inspect a nearby pattern.
+4. Make the smallest safe change and preserve public contracts unless approved.
+5. Run the narrowest safe build/test when the environment permits it.
+6. Report summary, files, verification, risks, and the next roadmap gate.
+7. Update Commerce references only when durable status or contracts change.
 
-Fresh thread:
-1. Use this file and the always-on rules.
-2. Use `.agents/context/task-router.md` if present to choose domain context.
-3. Use `.agents/context/quick-scan.md` when the task starts from a route, symbol, log line, error code, or broad feature name and the right files are not obvious.
-4. Read `.agents/rules/spec-orchestrator.md` only for spec, orchestration, or handoff work.
+## Backend Standards
 
-Follow-up task:
-- Do not reload stable bootstrap/context unless the user says it changed, compaction removed needed details, or exact wording is needed.
-- Prefer targeted source search over broad context reading.
-- Source code wins when source and memory disagree.
-
-## Task Workflow
-
-1. Restate the task briefly.
-2. Classify it: New Feature Design, Bug Debugging, Refactoring, Architecture Review, or Implementation.
-3. Identify the smallest boundary: route, controller, command/query, handler, validator, entity, repository, hub, worker, integration, Redis/SignalR/IoT contract.
-4. Search before opening files.
-5. Inspect a nearby working pattern before editing.
-6. Make the smallest safe change.
-7. Preserve local conventions over generic best practices.
-8. Verify with the narrowest relevant check, or explain why verification was not run.
-9. Report summary, files changed, verification, and risks.
-10. Update a relevant skill/domain report only when the task creates durable knowledge.
-
-## Search Strategy
-
-Prefer `rg`:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .agents\scripts\find-related-files.ps1 -Term "<term>"
-powershell -ExecutionPolicy Bypass -File .agents\scripts\summarize-module.ps1 -Path "Core\Ecom.Application\Features\<Feature>"
-rg "Route|HttpGet|HttpPost|HttpPut|HttpDelete|<route-term>" Presentation/Ecom.API/Controllers
-rg "<ActionOrFeature>|IRequest|IRequestHandler" Core/Ecom.Application/Features
-rg "AbstractValidator|RuleFor" Core/Ecom.Application/Features/<Feature>
-rg "EnableUnitOfWork|SaveChangesAsync|CommitTransactionAsync|Repository<" Core/Ecom.Application/Features/<Feature>
-rg "Permissions\.|Authorize\(" Presentation/Ecom.API Core/Ecom.Application/Features/<Feature>
-rg "ScaleSession_|Scale_|Device_|Cycle_|TelemetryHub|Code 503" Presentation Infrastructure Core
-rg "TelemetryHandler|IoT|EventHub|MQTT|Code 300|Oxy" Infrastructure/Ecom.Infrastructure
-rg "Fact|Theory|describe\(|it\(|test\("
-```
-
-Open large files only after symbol search, especially large controllers, `DependencyInjection.cs`, report generators, IoT managers, `Permissions.cs`, and `ErrorCodes.cs`.
-
-## Code Quality Rules
-
-- Keep controllers thin; put business rules in Application/Domain.
-- Use MediatR commands/queries and FluentValidation according to nearby patterns.
+- Keep controllers thin; use MediatR commands/queries and FluentValidation.
+- Put business invariants and state transitions in Domain methods.
 - Use existing `TResult`, `ApiResponse`, `MessageKey`, and `ErrorCodes` conventions.
-- Use `[EnableUnitOfWork]`, `IUnitOfWork`, repositories, `IApplicationDbContext`, and explicit `SaveChangesAsync` according to local patterns.
-- Prefer domain methods for state transitions when they exist.
-- Do not add abstractions unless they remove real duplication, match an existing pattern, or materially improve isolation/testability.
-- Do not broad-refactor large controllers/handlers during a local fix.
-- Add comments only for non-obvious domain rules or important tradeoffs.
+- Use UnitOfWork/transactions for multi-write commerce operations.
+- Keep one Commerce entity and one EF configuration per file.
+- Keep cross-aggregate references ID-based; avoid large bidirectional navigation graphs.
+- Never trust client price, stock, discount, payment result, or order totals.
+- Use PostgreSQL integration tests for constraints, concurrency, and migrations; do not use EF InMemory for those claims.
 
-## Non-Negotiable Safety Rules
+## Approval Gates
 
-Do not change these without explicit approval:
-- public APIs, routes, request/response DTOs, or handler signatures,
-- auth, JWT/current-user behavior, permissions, roles, seeded policies, Logout,
-- EF migrations, model snapshots, `ApplicationDbContext`, entity configurations,
-- Redis key formats,
-- SignalR group names,
-- IoT telemetry codes/contracts or device-control behavior,
-- `appsettings*.json`, `.env`, certificates, secrets, keys, local runtime config,
-- dependencies, CI/CD, deployment, infrastructure.
+Require explicit approval before changing public APIs, auth/permissions, EF migrations/snapshot/DbContext/configurations, dependencies, runtime configuration, secrets, infrastructure, or deployment.
 
-Never hardcode or log secrets, JWTs, refresh tokens, FCM tokens, IoT credentials, Basic Auth credentials, connection strings, or raw file payloads.
+Never log secrets, JWT/refresh tokens, guest cart tokens, payment credentials, connection strings, private customer data, or raw uploads.
 
-Do not rename typo-bearing existing files or public types only for cleanup. Names such as `Hanlder`, `Vadilator`, and `CreateImportRecept` may be referenced.
+## Delegation
 
-## High-Risk Areas
-
-Load risk/domain context before touching:
-- Auth, JWT, refresh tokens, Logout, current-user claims, roles, policies, permissions.
-- EF migrations, DbContext, entity configurations, UnitOfWork, repository behavior.
-- Scale realtime: Code 503 telemetry, Redis contexts/snapshots, SignalR groups, session/scale/cycle identity.
-- IoT control: DeviceHub, WarningDeviceHub, firmware, schedules, direct methods.
-- FCM notifications and recipient resolution.
-- Warehouse receipts, inventory check, stock transfer.
-- Background workers, camera/media services, Basic Auth/TLS handling.
-- Large report/export generation.
+Keep requirements, decisions, and integration in the main task. Delegate only independent workstreams such as read-only exploration, test-gap analysis, security review, or verification. Avoid parallel edits to the same aggregate, schema, migration, or API contract; keep delegation depth at one.
 
 ## Verification
 
-Builds are user-run by default unless the user asks the agent to run them. For code changes, recommend the narrowest relevant command. If no dedicated test project exists, state the gap and recommend focused build verification.
+Run verification in proportion to risk and record exact commands/results. A blocked or skipped check is not a pass. For Commerce, follow `.agents/skills/commerce-system/references/implementation-roadmap.md`; never apply a migration without explicit approval and staging evidence.
 
-Docs or guidance changes should run available guidance/skill verification scripts when present.
-
-## Final Response Format
+## Final Response
 
 - Summary
 - Files changed
 - Verification run
 - Risks / follow-ups
-

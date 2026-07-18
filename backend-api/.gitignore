@@ -257,10 +257,12 @@ WebApi/wwwroot
 WebApi/appsettings*.json
 .dotnet-home/
 .vscode/
+.reuse-staging/
 
 # Baseline safety: local configuration and deployment files can contain credentials.
 # They stay outside the initial local Git baseline until rewritten for the new project.
 Presentation/Ecom.API/appsettings.Local.json
+Presentation/Ecom.API/appsettings.Local.json.tmp
 Presentation/Ecom.API/appsettings.Development.Local.json
 Presentation/Ecom.API/appsettings.Production.json
 Presentation/Ecom.API/Properties/launchSettings.json

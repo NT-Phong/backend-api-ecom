@@ -1,0 +1,89 @@
+{
+  "sourceProject": "Mebieco backend API",
+  "entries": [
+    {
+      "group": "foundation-reference",
+      "source": "Core/Mebieco.Domain/Common/BaseEntity.cs",
+      "destination": "Core/Ecom.Domain/Common/BaseEntity.cs",
+      "action": "reference_only",
+      "reason": "Already exists in Ecom; compare only."
+    },
+    {
+      "group": "foundation-reference",
+      "source": "Core/Mebieco.Application/Common/Behaviours/ValidationBehaviour.cs",
+      "destination": "Core/Ecom.Application/Common/Behaviours/ValidationBehaviour.cs",
+      "action": "reference_only",
+      "reason": "Already exists in Ecom; compare only."
+    },
+    {
+      "group": "foundation-reference",
+      "source": "Infrastructure/Mebieco.Infrastructure/Security/JwtTokenService.cs",
+      "destination": "Infrastructure/Ecom.Infrastructure/Security/JwtTokenService.cs",
+      "action": "reference_only",
+      "reason": "Already exists in Ecom; compare only."
+    },
+    {
+      "group": "optional-locking",
+      "source": "Infrastructure/Mebieco.Infrastructure/Locking/RedisDistributedLockService.cs",
+      "destination": "Infrastructure/Ecom.Infrastructure/Locking/RedisDistributedLockService.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; inspect Redis dependency and lease semantics before registration."
+    },
+    {
+      "group": "optional-media",
+      "source": "Core/Mebieco.Domain/Interfaces/Services/IStorageService.cs",
+      "destination": "Core/Ecom.Domain/Interfaces/Services/IStorageService.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; needed only when product/media upload scope opens."
+    },
+    {
+      "group": "optional-media",
+      "source": "Infrastructure/Mebieco.Infrastructure/Services/StorageService.cs",
+      "destination": "Infrastructure/Ecom.Infrastructure/Services/StorageService.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; review provider configuration and upload security."
+    },
+    {
+      "group": "optional-document",
+      "source": "Core/Mebieco.Domain/Interfaces/Services/IDocumentService.cs",
+      "destination": "Core/Ecom.Domain/Interfaces/Services/IDocumentService.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; use later for invoice/order documents."
+    },
+    {
+      "group": "optional-document",
+      "source": "Infrastructure/Mebieco.Infrastructure/Services/DocumentService.cs",
+      "destination": "Infrastructure/Ecom.Infrastructure/Services/DocumentService.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; inspect templates and external dependencies first."
+    },
+    {
+      "group": "optional-notification",
+      "source": "Core/Mebieco.Application/Common/Interfaces/ISmsSender.cs",
+      "destination": "Core/Ecom.Application/Common/Interfaces/ISmsSender.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; review OTP provider contract before use."
+    },
+    {
+      "group": "optional-notification",
+      "source": "Infrastructure/Mebieco.Infrastructure/Services/Sms/SmsSender.cs",
+      "destination": "Infrastructure/Ecom.Infrastructure/Services/Sms/SmsSender.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; must not copy provider keys or runtime settings."
+    },
+    {
+      "group": "optional-seeding",
+      "source": "Infrastructure/Mebieco.Infrastructure/Seeding/MasterDataSeeder.cs",
+      "destination": "Infrastructure/Ecom.Infrastructure/Seeding/MasterDataSeeder.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; rewrite master data for Commerce before apply."
+    },
+    {
+      "group": "optional-seeding",
+      "source": "Infrastructure/Mebieco.Infrastructure/Seeding/DevDataSeeder.cs",
+      "destination": "Infrastructure/Ecom.Infrastructure/Seeding/DevDataSeeder.cs",
+      "action": "stage_only",
+      "reason": "Missing in Ecom; review sample data and remove aquaculture assumptions."
+    }
+  ]
+}

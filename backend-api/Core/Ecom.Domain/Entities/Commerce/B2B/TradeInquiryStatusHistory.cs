@@ -8,6 +8,17 @@ public class TradeInquiryStatusHistory : BaseEntity
     public Guid? ChangedByUserId { get; private set; }
     public DateTime ChangedAt { get; private set; }
 
+    internal static TradeInquiryStatusHistory Create(Guid inquiryId, TradeInquiryStatus? from, TradeInquiryStatus to,
+        string? reason, Guid? actorId, DateTime changedAt) => new()
+        {
+            TradeInquiryId = inquiryId,
+            FromStatus = from,
+            ToStatus = to,
+            Reason = reason?.Trim(),
+            ChangedByUserId = actorId,
+            ChangedAt = changedAt
+        };
+
     private TradeInquiryStatusHistory()
     {
     }

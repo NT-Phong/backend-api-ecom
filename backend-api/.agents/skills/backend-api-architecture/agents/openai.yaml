@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend API Architecture"
+  short_description: "Review and build reliable Ecom backend flows"
+  default_prompt: "Use $backend-api-architecture to trace this backend request through its boundaries and produce an evidence-backed implementation or review."

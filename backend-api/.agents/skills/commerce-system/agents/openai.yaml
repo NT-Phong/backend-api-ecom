@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commerce System"
+  short_description: "Commerce entities, schema, flows, and progress"
+  default_prompt: "Use $commerce-system to inspect the current commerce model, relationships, implementation status, and next safe task."

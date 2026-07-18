@@ -2,11 +2,11 @@ Project ThanhHoaCommerce {
   database_type: 'PostgreSQL'
 }
 
-Table Tbl_AdministrativeArea {
 Table Tbl_User {
   Id uuid [pk]
 }
 
+Table Tbl_AdministrativeArea {
   Id uuid [pk]
   ParentId uuid
   Code text

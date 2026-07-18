@@ -2096,10 +2096,17 @@ namespace Ecom.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ScanFailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("ScanStatus")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("ScannedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
@@ -2134,7 +2141,7 @@ namespace Ecom.Infrastructure.Migrations
 
                     b.ToTable("Tbl_MediaAsset", null, t =>
                         {
-                            t.HasCheckConstraint("CK_MediaAsset_SizeBytes", "\"SizeBytes\" >= 0");
+                            t.HasCheckConstraint("CK_MediaAsset_SizeBytes", "\"SizeBytes\" > 0");
                         });
                 });
 
@@ -6910,6 +6917,45 @@ namespace Ecom.Infrastructure.Migrations
                         .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Tbl_WishlistItem", (string)null);
+                });
+
+            modelBuilder.Entity("Ecom.Infrastructure.Persistence.Outbox.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("OccurredOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedAt", "NextAttemptAt", "OccurredOn")
+                        .HasDatabaseName("IX_OutboxMessage_Pending");
+
+                    b.ToTable("Tbl_OutboxMessage", (string)null);
                 });
 
             modelBuilder.Entity("Ecom.Domain.Entities.AdministrativeArea", b =>

@@ -1,100 +1,38 @@
 $ErrorActionPreference = "Stop"
 
-$requiredFiles = @(
-    "AGENTS.md",
-    ".agents/README.md",
-    ".agents/context/project-map.md",
-    ".agents/context/task-router.md",
-    ".agents/context/codebase-analysis.md",
-    ".agents/context/risk-map.md",
-    ".agents/rules/agent-directives.md",
-    ".agents/rules/optimized-workflow.md",
-    ".agents/rules/safety-constraints.md",
-    ".agents/skills/backend-api-architecture/SKILL.md",
-    ".agents/skills/backend-api-architecture/references/execution-workflow.md",
-    ".agents/skills/backend-api-architecture/templates/request-intake.md",
-    ".agents/skills/backend-api-architecture/templates/skill-report-update.md"
-)
+$skills = Get-ChildItem -LiteralPath ".agents/skills" -Directory
+foreach ($skill in $skills) {
+    $entry = Join-Path $skill.FullName "SKILL.md"
+    $metadata = Join-Path $skill.FullName "agents/openai.yaml"
+    if (-not (Test-Path -LiteralPath $entry)) { throw "Missing SKILL.md: $($skill.Name)" }
+    if (-not (Test-Path -LiteralPath $metadata)) { throw "Missing agents/openai.yaml: $($skill.Name)" }
 
-$errors = New-Object System.Collections.Generic.List[string]
-
-foreach ($file in $requiredFiles) {
-    if (-not (Test-Path -LiteralPath $file)) {
-        $errors.Add("Missing required guidance file: $file")
+    $content = Get-Content -LiteralPath $entry -Raw
+    if ($content -notmatch '(?s)^---\s*\r?\nname:\s*([^\r\n]+)\r?\ndescription:\s*([^\r\n]+)\r?\n---') {
+        throw "SKILL.md frontmatter must contain only name then description: $($skill.Name)"
     }
+    $declaredName = $Matches[1].Trim()
+    if ($declaredName -ne $skill.Name) { throw "Skill folder/name mismatch: $($skill.Name) != $declaredName" }
+
+    $lineCount = (Get-Content -LiteralPath $entry).Count
+    if ($lineCount -gt 100) { throw "SKILL.md exceeds 100-line project budget: $($skill.Name) ($lineCount)" }
+
+    $ui = Get-Content -LiteralPath $metadata -Raw
+    foreach ($field in @('display_name:', 'short_description:', 'default_prompt:')) {
+        if ($ui -notmatch [regex]::Escape($field)) { throw "Missing $field in $metadata" }
+    }
+    if ($ui -notmatch [regex]::Escape("`$$declaredName")) { throw "default_prompt must mention `$$declaredName" }
 }
 
-Write-Output "Checking SKILL.md frontmatter..."
-$skillDirectories = Get-ChildItem -LiteralPath ".agents/skills" -Directory
-foreach ($skillDirectory in $skillDirectories) {
-    $files = Get-ChildItem -LiteralPath $skillDirectory.FullName -File
-    $exactEntry = $files | Where-Object { $_.Name -ceq "SKILL.md" }
-    $caseVariantEntry = $files | Where-Object { $_.Name -ieq "SKILL.md" -and $_.Name -cne "SKILL.md" }
-
-    if ($caseVariantEntry) {
-        $errors.Add("Skill entrypoint must be exactly SKILL.md: $($caseVariantEntry.FullName)")
-    }
-
-    $hasSkillDocsOnlyMarker = $files | Where-Object { $_.Name -ceq ".doc-only" }
-    if (-not $exactEntry -and -not $hasSkillDocsOnlyMarker) {
-        $errors.Add("Missing SKILL.md in skill directory: $($skillDirectory.FullName)")
-    }
-}
-
-$skillFiles = Get-ChildItem -LiteralPath ".agents/skills" -Recurse -File | Where-Object { $_.Name -ceq "SKILL.md" }
-foreach ($skill in $skillFiles) {
-    $content = Get-Content -LiteralPath $skill.FullName -Raw
-    if ($content -notmatch '(?s)^---\s*\r?\n.*?\r?\n---') {
-        $errors.Add("Missing YAML frontmatter: $($skill.FullName)")
-        continue
-    }
-
-    $frontmatter = [regex]::Match($content, '(?s)^---\s*\r?\n(.*?)\r?\n---').Groups[1].Value
-    if ($frontmatter -notmatch '(?m)^name:\s*\S+') {
-        $errors.Add("Missing frontmatter name: $($skill.FullName)")
-    }
-    if ($frontmatter -notmatch '(?m)^description:\s*\S+') {
-        $errors.Add("Missing frontmatter description: $($skill.FullName)")
-    }
-}
-
-Write-Output "Checking markdown links inside .agents..."
-$markdownFiles = Get-ChildItem -LiteralPath ".agents" -Recurse -File -Filter "*.md"
-foreach ($md in $markdownFiles) {
-    $text = Get-Content -LiteralPath $md.FullName -Raw
-    $matches = [regex]::Matches($text, '\[[^\]]+\]\(([^)]+)\)')
-
-    foreach ($match in $matches) {
+$markdown = Get-ChildItem -LiteralPath ".agents/skills" -Recurse -File -Filter "*.md"
+foreach ($file in $markdown) {
+    $text = Get-Content -LiteralPath $file.FullName -Raw
+    foreach ($match in [regex]::Matches($text, '\[[^\]]+\]\(([^)]+)\)')) {
         $target = $match.Groups[1].Value.Trim()
-        if ($target -eq "" -or $target.StartsWith("#") -or $target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:') {
-            continue
-        }
-
-        $targetWithoutAnchor = $target.Split("#")[0]
-        if ($targetWithoutAnchor -eq "") {
-            continue
-        }
-
-        $baseDir = Split-Path -Parent $md.FullName
-        $resolved = Join-Path $baseDir $targetWithoutAnchor
-        if (-not (Test-Path -LiteralPath $resolved)) {
-            $errors.Add("Broken markdown link in $($md.FullName): $target")
-        }
+        if ($target -eq '' -or $target.StartsWith('#') -or $target -match '^[a-zA-Z][a-zA-Z0-9+.-]*:') { continue }
+        $resolved = Join-Path (Split-Path -Parent $file.FullName) $target.Split('#')[0]
+        if (-not (Test-Path -LiteralPath $resolved)) { throw "Broken skill link in $($file.FullName): $target" }
     }
-}
-
-Write-Output "Checking stale .github/skills references..."
-$stale = rg -n "\.github/skills|\.github\\skills" AGENTS.md .agents
-if ($LASTEXITCODE -eq 0) {
-    Write-Output $stale
-    Write-Output "Only intentional canonical-memory warnings should remain."
-} else {
-    Write-Output "No stale .github/skills references found."
-}
-
-if ($errors.Count -gt 0) {
-    $errors | ForEach-Object { Write-Error $_ }
-    exit 1
 }
 
 Write-Output "Skill docs verification completed."

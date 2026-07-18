@@ -2,8 +2,15 @@ using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Local secrets override tracked development defaults without entering Git.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+}
 
 // Force lowercase URLs
 builder.Services.AddRouting(options =>
@@ -120,6 +127,23 @@ if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 }
 
 // app.UseHttpsRedirection(); // Disabled for HTTP-only deployment
+
+// Expose only promoted public media. Quarantine and private files remain outside this file provider.
+var webRoot = string.IsNullOrWhiteSpace(app.Environment.WebRootPath)
+    ? Path.Combine(app.Environment.ContentRootPath, "wwwroot")
+    : app.Environment.WebRootPath;
+var publicMediaRoot = Path.Combine(webRoot, "uploads", "public");
+Directory.CreateDirectory(publicMediaRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(publicMediaRoot),
+    RequestPath = "/media",
+    OnPrepareResponse = context =>
+    {
+        context.Context.Response.Headers.CacheControl = "public,max-age=86400";
+        context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    }
+});
 
 
 // Add custom middleware

@@ -7,6 +7,7 @@ using Ecom.Infrastructure.Persistence.Database.Interceptors;
 using Ecom.Infrastructure.Persistence.Database.UnitOfWork;
 using Ecom.Infrastructure.Security.Authorization;
 using Ecom.Infrastructure.Locking;
+using Ecom.Infrastructure.Services;
 using Ecom.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -47,14 +48,21 @@ public static class DependencyInjection
         var dataSource = dataSourceBuilder.Build();
 
         services.AddScoped<AuditableEntityInterceptor>();
+        services.AddScoped<ConvertDomainEventsToOutboxInterceptor>();
         services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+        {
             options.UseNpgsql(dataSource, serverOptions =>
                 {
                     serverOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
                     serverOptions.CommandTimeout(30); // 30 second timeout
                 })
                 .EnableSensitiveDataLogging(false)
-                .AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>()));
+                .AddInterceptors(serviceProvider.GetRequiredService<AuditableEntityInterceptor>());
+
+            // Keep disabled until the outbox migration and PostgreSQL atomicity tests pass.
+            if (configuration.GetValue<bool>("Outbox:Enabled"))
+                options.AddInterceptors(serviceProvider.GetRequiredService<ConvertDomainEventsToOutboxInterceptor>());
+        });
 
         // Repositories
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
@@ -66,6 +74,11 @@ public static class DependencyInjection
         // Services
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IDateTimeService, DateTimeService>();
+        services.AddScoped<IHelperService, HelperService>();
+        services.AddScoped<IStorageService, LocalStorageService>();
+        services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IFileUploadPolicy, FileUploadPolicy>();
+        services.AddScoped<IMediaFileService, MediaFileService>();
 
         // Authentication & Security Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -164,7 +177,7 @@ public static class DependencyInjection
                 options.InstanceName = "Starter:";
             });
 
-            services.AddSingleton<IDistributedLockService, InMemoryDistributedLockService>();
+            services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
         }
         else
         {

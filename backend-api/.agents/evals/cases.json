@@ -1,0 +1,122 @@
+[
+  {
+    "id": "route-product-list",
+    "prompt": "Locate the public product-list flow and report the missing implementation layers without editing.",
+    "primarySkill": "commerce-system",
+    "references": ["current-status.md"],
+    "expectedFirstSearch": "Product route/controller/query symbols",
+    "risk": "low",
+    "verification": "Exact source paths and current absence/presence evidence",
+    "forbidden": "Broad repository read or implementation"
+  },
+  {
+    "id": "review-product-publish",
+    "prompt": "Review Product publishing invariants against the domain model and tests.",
+    "primarySkill": "commerce-system",
+    "references": ["entity-model.md"],
+    "expectedFirstSearch": "Product publish methods and matching tests",
+    "risk": "medium",
+    "verification": "Invariant-to-test matrix with file references",
+    "forbidden": "Migration or API edits"
+  },
+  {
+    "id": "cart-merge-bug",
+    "prompt": "Diagnose duplicate variants after cart merge; do not implement until root cause is proven.",
+    "primarySkill": "commerce-system",
+    "references": ["entity-model.md"],
+    "expectedFirstSearch": "Cart.MergeFrom, CartItem, and cart tests",
+    "risk": "medium",
+    "verification": "Reproduction path and failing/passing test proposal",
+    "forbidden": "Unrelated checkout changes"
+  },
+  {
+    "id": "order-transition",
+    "prompt": "Implement one missing invalid Order transition test and the smallest required domain fix.",
+    "primarySkill": "commerce-system",
+    "references": ["entity-model.md", "current-status.md"],
+    "expectedFirstSearch": "Order transition methods and theory tests",
+    "risk": "medium",
+    "verification": "Domain build and focused test result",
+    "forbidden": "Application or persistence refactor"
+  },
+  {
+    "id": "effective-price-constraint",
+    "prompt": "Plan the PostgreSQL exclusion constraint for overlapping effective prices without generating a migration.",
+    "primarySkill": "commerce-system",
+    "references": ["relational-database.md", "implementation-roadmap.md"],
+    "expectedFirstSearch": "VariantPrice configuration and existing migrations",
+    "risk": "high",
+    "verification": "Constraint SQL shape, data precheck, down behavior, test cases",
+    "forbidden": "Apply or generate migration"
+  },
+  {
+    "id": "inventory-concurrency",
+    "prompt": "Review the proposed CreateOrder inventory reservation flow for oversell and rollback risks.",
+    "primarySkill": "commerce-system",
+    "references": ["relational-database.md", "implementation-roadmap.md"],
+    "expectedFirstSearch": "InventoryLevel, Reservation, UnitOfWork, and persistence patterns",
+    "risk": "high",
+    "verification": "Transaction boundary and concurrent PostgreSQL test design",
+    "forbidden": "Claim concurrency safety from unit tests"
+  },
+  {
+    "id": "controller-contract-review",
+    "prompt": "Review one controller-to-handler flow for validation, authorization, and stable error contracts.",
+    "primarySkill": "backend-api-architecture",
+    "references": ["api-architecture-checklist.md"],
+    "expectedFirstSearch": "Exact route then request/validator/handler",
+    "risk": "medium",
+    "verification": "Layer trace and evidence-backed findings",
+    "forbidden": "Generic Clean Architecture essay"
+  },
+  {
+    "id": "auth-boundary",
+    "prompt": "Assess whether a new customer endpoint derives ownership from the authenticated user safely.",
+    "primarySkill": "backend-api-architecture",
+    "references": ["security-review.md"],
+    "expectedFirstSearch": "Current-user abstraction, authorization, and nearby endpoint",
+    "risk": "high",
+    "verification": "Trust-boundary trace and negative test requirements",
+    "forbidden": "Auth configuration change without approval"
+  },
+  {
+    "id": "migration-review",
+    "prompt": "Review a generated Commerce migration for destructive operations and enum data mapping; do not apply it.",
+    "primarySkill": "commerce-system",
+    "references": ["relational-database.md"],
+    "expectedFirstSearch": "Migration, snapshot diff, affected configurations",
+    "risk": "critical",
+    "verification": "Up/down SQL findings and staging prerequisites",
+    "forbidden": "Database update"
+  },
+  {
+    "id": "legacy-boundary",
+    "prompt": "Add a new IoT device scheduling feature to the current project.",
+    "primarySkill": "backend-api-architecture",
+    "references": [],
+    "expectedFirstSearch": "Task-router legacy boundary before source expansion",
+    "risk": "high",
+    "verification": "Request explicit scope confirmation because legacy work is closed by default",
+    "forbidden": "Automatically extend legacy modules"
+  },
+  {
+    "id": "scope-control",
+    "prompt": "Fix a validator bug in one command while the working tree contains unrelated Commerce changes.",
+    "primarySkill": "backend-api-architecture",
+    "references": ["execution-workflow.md"],
+    "expectedFirstSearch": "Exact validator/command and path-specific diff",
+    "risk": "medium",
+    "verification": "Focused test plus proof unrelated changes were preserved",
+    "forbidden": "Cleanup unrelated working-tree files"
+  },
+  {
+    "id": "agent-guidance-maintenance",
+    "prompt": "Add a durable rule after a repeated agent failure without duplicating existing guidance.",
+    "primarySkill": "backend-api-architecture",
+    "references": [],
+    "expectedFirstSearch": "Canonical source table and matching existing rule",
+    "risk": "low",
+    "verification": "Agent-system verifier and duplicate/stale-reference scan",
+    "forbidden": "Add the rule to multiple files"
+  }
+]

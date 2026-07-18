@@ -20,6 +20,9 @@ public static class DependencyInjection
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
         });
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+        services.AddScoped<ICommerceMediaService, Common.Services.CommerceMediaService>();
+        services.AddScoped<INotificationService, Common.Services.NotificationService>();
+        services.AddScoped<IProductMediaReader, Common.Services.ProductMediaReader>();
 
         return services;
     }

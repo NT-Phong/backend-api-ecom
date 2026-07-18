@@ -8,6 +8,17 @@ public class ShipmentHistory : BaseEntity
     public Guid? ChangedByUserId { get; private set; }
     public DateTime OccurredAt { get; private set; }
 
+    internal static ShipmentHistory Create(Guid shipmentId, ShipmentStatus? from, ShipmentStatus to, string? reason, Guid? actorId, DateTime occurredAt) =>
+        new()
+        {
+            ShipmentId = shipmentId,
+            FromStatus = from,
+            ToStatus = to,
+            Reason = reason?.Trim(),
+            ChangedByUserId = actorId,
+            OccurredAt = occurredAt
+        };
+
     private ShipmentHistory()
     {
     }
