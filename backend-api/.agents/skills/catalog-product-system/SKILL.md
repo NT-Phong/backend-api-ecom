@@ -1,6 +1,6 @@
 ﻿---
 name: catalog-product-system
-description: Analyze, review, plan, implement, or debug the Ecom Catalog Product slice: Product, Category, ProductCategory, ProductMedia, ProductVariant, VariantPrice, public storefront APIs, backoffice Product lifecycle, effective pricing, permissions, CQRS handlers, PostgreSQL constraints, and delivery progress. Use when a request names Catalog, Product, Variant, Price, product APIs, publish flow, product media, category mapping, or needs a source-backed progress assessment without scanning the whole repository.
+description: Analyze, review, plan, implement, or debug the Ecom Catalog Product slice Product, Category, ProductCategory, ProductMedia, ProductVariant, VariantPrice, public storefront APIs, backoffice Product lifecycle, effective pricing, permissions, CQRS handlers, PostgreSQL constraints, and delivery progress. Use when a request names Catalog, Product, Variant, Price, product APIs, publish flow, product media, category mapping, or needs a source-backed progress assessment without scanning the whole repository.
 ---
 
 # Catalog Product System
