@@ -106,6 +106,12 @@ SerilogExtensions.InitializeHttpContextEnricher(app.Services);
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+}
+
+// Swagger is local-development by default. A non-development environment must
+// explicitly opt in through Swagger:Enabled (for example, a restricted test app).
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
+{
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
