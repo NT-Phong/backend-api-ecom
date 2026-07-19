@@ -29,6 +29,25 @@ public class Product : BaseEntity, IAggregateRoot
         ApplyDetails(ProducerId, name, slug, shortDescription, description, usageInstructions, storageInstructions, warningText, metaTitle, metaDescription);
     }
 
+    public IReadOnlyList<ProductCategory> ReplaceCategories(ICollection<ProductCategory> categories,
+        IReadOnlyCollection<ProductCategoryAssignment> assignments)
+    {
+        EnsureNotDiscontinued();
+        if (assignments.Count == 0)
+            throw new CommerceDomainException("PRODUCT_CATEGORY_REQUIRED", "At least one category is required.");
+        if (assignments.Count(x => x.IsPrimary) != 1)
+            throw new CommerceDomainException("PRODUCT_PRIMARY_CATEGORY_REQUIRED", "Exactly one primary category is required.");
+        if (assignments.Any(x => x.CategoryId == Guid.Empty) || assignments.Select(x => x.CategoryId).Distinct().Count() != assignments.Count)
+            throw new CommerceDomainException("PRODUCT_CATEGORY_INVALID", "Product categories must be unique and valid.");
+
+        var replacements = assignments
+            .Select(x => ProductCategory.Create(Id, x.CategoryId, x.IsPrimary))
+            .ToList();
+        categories.Clear();
+        foreach (var category in replacements) categories.Add(category);
+        return replacements;
+    }
+
     public ProductMedia AttachMedia(ICollection<ProductMedia> media, Guid mediaAssetId, int displayOrder,
         bool makePrimary, bool mediaIsPubliclyUsable, string? caption = null)
     {
@@ -64,6 +83,15 @@ public class Product : BaseEntity, IAggregateRoot
         var target = media.SingleOrDefault(x => x.MediaAssetId == mediaAssetId)
             ?? throw new CommerceDomainException("PRODUCT_MEDIA_NOT_FOUND", "Product media was not found.");
         target.Reorder(displayOrder);
+    }
+
+    public void UpdateMedia(ICollection<ProductMedia> media, Guid mediaAssetId, int displayOrder, string? caption)
+    {
+        EnsureNotDiscontinued();
+        var target = media.SingleOrDefault(x => x.MediaAssetId == mediaAssetId)
+            ?? throw new CommerceDomainException("PRODUCT_MEDIA_NOT_FOUND", "Product media was not found.");
+        target.Reorder(displayOrder);
+        target.UpdateCaption(caption);
     }
 
     public void RemoveMedia(ICollection<ProductMedia> media, Guid mediaAssetId)
@@ -114,6 +142,14 @@ public class Product : BaseEntity, IAggregateRoot
             return;
         ChangeStatus(ProductStatus.Discontinued);
         UnpublishedAt = discontinuedAt;
+    }
+
+    public void EnsureContentCanBeChanged() => EnsureNotDiscontinued();
+
+    public Guid RenewConcurrencyStamp()
+    {
+        ConcurrencyStamp = Guid.NewGuid();
+        return ConcurrencyStamp;
     }
 
     private void ChangeStatus(ProductStatus target)

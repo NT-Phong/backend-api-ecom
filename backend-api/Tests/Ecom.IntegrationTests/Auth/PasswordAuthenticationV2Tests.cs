@@ -1,6 +1,7 @@
 using Ecom.Application.Common.Configuration;
 using Ecom.Application.Features.AuthV2.Login;
 using Ecom.Application.Features.AuthV2.Register;
+using Ecom.Application.Features.Auth.Commands.UpdateBasicProfile;
 using Ecom.Infrastructure.Security;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -55,6 +56,14 @@ public sealed class PasswordAuthenticationV2Tests
     {
         var validator = new PasswordLoginCommandValidator();
         Assert.False(validator.Validate(new PasswordLoginCommand("buyer.one", new string('x', 129), "device", false)).IsValid);
+    }
+
+    [Fact]
+    public void Basic_profile_requires_a_non_blank_name()
+    {
+        var validator = new UpdateBasicProfileCommandValidator();
+        Assert.False(validator.Validate(new UpdateBasicProfileCommand("  ")).IsValid);
+        Assert.True(validator.Validate(new UpdateBasicProfileCommand("Nguyen Van A")).IsValid);
     }
 
     private sealed class EnvironmentStub(string name) : IHostEnvironment

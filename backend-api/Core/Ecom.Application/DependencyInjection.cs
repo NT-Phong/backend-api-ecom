@@ -23,6 +23,9 @@ public static class DependencyInjection
         services.AddScoped<ICommerceMediaService, Common.Services.CommerceMediaService>();
         services.AddScoped<INotificationService, Common.Services.NotificationService>();
         services.AddScoped<IProductMediaReader, Common.Services.ProductMediaReader>();
+
+        services.AddScoped<IEffectivePriceResolver, Common.Services.EffectivePriceResolver>();
+        services.AddScoped<ICatalogProductAccessService, Common.Services.CatalogProductAccessService>();
 		services.AddScoped<IAuthenticationSessionEngine, Common.Services.AuthenticationSessionEngine>();
         services.AddScoped<IUserAuthorizationSnapshotService, Common.Services.UserAuthorizationSnapshotService>();
 

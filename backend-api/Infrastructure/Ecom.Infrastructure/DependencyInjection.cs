@@ -37,6 +37,10 @@ public static class DependencyInjection
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<OtpSettings>(configuration.GetSection(OtpSettings.SectionName));
         services.Configure<AuthRateLimitOptions>(configuration.GetSection(AuthRateLimitOptions.SectionName));
+        services.AddSingleton<IValidateOptions<DemoQrLoginOptions>, DemoQrLoginOptionsValidator>();
+        services.AddOptions<DemoQrLoginOptions>()
+            .Bind(configuration.GetSection(DemoQrLoginOptions.SectionName))
+            .ValidateOnStart();
         services.Configure<PasswordSettings>(configuration.GetSection(PasswordSettings.SectionName));
         services.Configure<EmailVerificationOptions>(configuration.GetSection(EmailVerificationOptions.SectionName));
         services.AddSingleton<IValidateOptions<PasswordAuthenticationV2Options>, PasswordAuthenticationV2OptionsValidator>();
@@ -210,9 +214,19 @@ public static class DependencyInjection
 
         #endregion
 
-        // Redis setup:
+        // Distributed auth rate limits: Development can explicitly choose process-local counters;
+        // production must either use Redis or fail closed.
+        var authRateLimitSettings = configuration.GetSection(AuthRateLimitOptions.SectionName)
+            .Get<AuthRateLimitOptions>() ?? new AuthRateLimitOptions();
         var redisConnection = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrWhiteSpace(redisConnection))
+        if (authRateLimitSettings.Backend == AuthRateLimitBackend.InMemory)
+        {
+            services.AddDistributedMemoryCache();
+            services.AddSingleton<IDistributedLockService, InMemoryDistributedLockService>();
+            services.AddSingleton<IAuthRateLimitCounterStore, InMemoryAuthRateLimitCounterStore>();
+            services.AddSingleton<IAuthRateLimitService, DistributedAuthRateLimitService>();
+        }
+        else if (authRateLimitSettings.Backend == AuthRateLimitBackend.Redis && !string.IsNullOrWhiteSpace(redisConnection))
         {
             var redisOptions = ConfigurationOptions.Parse(redisConnection);
             redisOptions.AbortOnConnectFail = false;
@@ -255,6 +269,7 @@ public static class DependencyInjection
         }
 
         services.AddScoped<IDistributedCacheService, DistributedCacheService>();
+        services.AddSingleton<IDemoQrLoginStore, DemoQrLoginStore>();
 
         // Health Checks
         services.AddScoped<LivenessHealthCheck>();

@@ -1,5 +1,6 @@
 using Ecom.Application.Common.Configuration;
 using Ecom.Domain.Entities;
+using Ecom.Domain.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Ecom.Application.Features.Auth.Commands.SendOtp;
@@ -18,7 +19,7 @@ public class SendOtpCommandHandler(
 
     public async Task<TResult<SendOtpResult>> Handle(SendOtpCommand request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.PhoneNumber))
+        if (!VietnamesePhoneNumber.TryNormalize(request.PhoneNumber, out var phoneNumber))
             return TResult<SendOtpResult>.Failure(MessageKey.PhoneNumberRequired, ErrorCodes.BAD_REQUEST);
 
         foreach (var policy in new[]
@@ -27,22 +28,34 @@ public class SendOtpCommandHandler(
                      AuthRateLimitPolicyNames.OtpSendDestinationDaily
                  })
         {
-            var rateLimit = await rateLimiter.AcquireAsync(policy, request.PhoneNumber, cancellationToken);
+            var rateLimit = await rateLimiter.AcquireAsync(policy, phoneNumber, cancellationToken);
             if (rateLimit.Status == AuthRateLimitStatus.Unavailable)
                 return TResult<SendOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
             if (rateLimit.Status == AuthRateLimitStatus.Rejected)
                 return TResult<SendOtpResult>.Failure(MessageKey.TooManyRequests, ErrorCodes.TOO_MANY_REQUESTS);
         }
-        if (!smsSender.IsConfigured && !otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber))
+        if (!smsSender.IsConfigured && !otpSecurity.IsDevelopmentTestAccount(phoneNumber))
             return TResult<SendOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
 
         try
         {
+            var legacyInternationalPhoneNumber = "84" + phoneNumber[1..];
             var user = await unitOfWork.Repository<User>()
-                .FindOneAsync(filters: [u => u.PhoneNumber == request.PhoneNumber], includes: [u => u.Role!]);
+                .FindOneAsync(
+                    filters: [u => u.NormalizedPhoneNumber == phoneNumber || u.NormalizedPhoneNumber == legacyInternationalPhoneNumber],
+                    includes: [u => u.Role!]);
 
-            // Keep the public result neutral for missing or disabled accounts.
-            if (user is null || user.Status == UserStatusEnum.Deactivated)
+            // A new number begins a pending registration. The public response remains neutral.
+            if (user is null)
+            {
+                var userRole = await unitOfWork.Repository<Role>()
+                    .FindOneAsync(filters: [r => r.Code == Permissions.Roles.User]);
+                user = new User(phoneNumber, userRole?.Id);
+                await unitOfWork.Repository<User>().InsertAsync(user, cancellationToken);
+            }
+
+            // Keep the public result neutral for disabled accounts.
+            if (user.Status == UserStatusEnum.Deactivated)
                 return Accepted();
 
             var purpose = user.Status == UserStatusEnum.Pending
@@ -63,7 +76,7 @@ public class SendOtpCommandHandler(
                 return Accepted();
             }
 
-            var isDevelopmentTestAccount = otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber);
+            var isDevelopmentTestAccount = otpSecurity.IsDevelopmentTestAccount(phoneNumber);
             var otpCode = isDevelopmentTestAccount
                 ? otpSecurity.DevelopmentOtp
                 : otpSecurity.GenerateCode();
@@ -82,7 +95,7 @@ public class SendOtpCommandHandler(
                     UserId = user.Id,
                     Code = protectedCode,
                     OtpTokenType = purpose,
-                    PhoneNumber = request.PhoneNumber,
+                    PhoneNumber = phoneNumber,
                     ExpiredAt = now.AddSeconds(_otpSettings.ExpirationSeconds),
                     MaxAttempts = _otpSettings.MaxAttempts,
                     IsUsed = false,
@@ -93,7 +106,7 @@ public class SendOtpCommandHandler(
             if (!isDevelopmentTestAccount)
             {
                 await smsSender.SendAsync(
-                    request.PhoneNumber,
+                    phoneNumber,
                     otpCode,
                     Math.Max(1, (int)Math.Ceiling(_otpSettings.ExpirationSeconds / 60d)),
                     cancellationToken);

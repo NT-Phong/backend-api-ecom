@@ -6,4 +6,7 @@ public interface IProductMediaReader
 {
     Task<IReadOnlyList<ProductMediaDto>> GetPublicMediaAsync(Guid productId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<Guid, ProductMediaDto>> GetPrimaryPublicMediaAsync(
+        IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default);
 }

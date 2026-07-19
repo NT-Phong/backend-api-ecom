@@ -1,6 +1,14 @@
 # Authentication V2 source map and phase status
 
-Verified against the working tree on 2026-07-18. Source/tests override older plans and proposal documents.
+Verified against the working tree on 2026-07-19. Source/tests override older plans and proposal documents.
+
+## V1 phone-first OTP slice
+
+`POST /api/v1/auth/send-otp` is the single phone-first entry point. It normalizes Vietnamese `0...` and `+84...` forms to one canonical value, creates a Pending `USER` for a new number, and returns the same accepted response for both registration and login. `POST /api/v1/auth/register` remains a compatibility wrapper.
+
+After `POST /api/v1/auth/verify-otp`, a user without `FullName` receives `LoginStatus = OPTIONAL_BASIC_PROFILE`, `CanSkipProfile = true`, and `ProfileState = BASIC_PROFILE_MISSING`; a name can be saved later with authenticated `PATCH /api/v1/auth/profile/basic`. This changes neither `IsProfileCompleted` nor the V2 password/session flow. Checkout integration is not yet present in source, so no checkout gate has been wired.
+
+Development explicitly uses the in-memory auth rate-limit backend and fixed OTP `0000`; production remains Redis-backed and fails closed with `503` after a bounded Redis operation timeout.
 
 ## Implemented mobile-password slice
 

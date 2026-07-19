@@ -35,6 +35,8 @@ public class VerifyOtpResult
     /// Cờ hoàn thiện hồ sơ người dùng
     /// </summary>
     public bool IsProfileCompleted { get; set; }
+    public bool CanSkipProfile { get; set; }
+    public string ProfileState { get; set; } = string.Empty;
     /// <summary>
     /// Trạng thái đăng nhập
     /// </summary>

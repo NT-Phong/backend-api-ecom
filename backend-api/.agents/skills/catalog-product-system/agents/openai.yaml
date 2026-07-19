@@ -1,0 +1,4 @@
+﻿interface:
+  display_name: "Catalog Product System"
+  short_description: "Catalog product source, API, flows, and progress"
+  default_prompt: "Use $catalog-product-system to inspect Catalog Product source, API contracts, implementation progress, and the next safe improvement."

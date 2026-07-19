@@ -1,4 +1,6 @@
 using StackExchange.Redis;
+using Ecom.Application.Common.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Ecom.Infrastructure.Security;
 
@@ -18,6 +20,7 @@ public interface IAuthRateLimitCounterStore
 /// </summary>
 public sealed class RedisAuthRateLimitCounterStore(
     IConnectionMultiplexer redis,
+    IOptions<AuthRateLimitOptions> options,
     ILogger<RedisAuthRateLimitCounterStore> logger) : IAuthRateLimitCounterStore
 {
     private const string FixedWindowScript = """
@@ -37,10 +40,12 @@ public sealed class RedisAuthRateLimitCounterStore(
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var result = (RedisResult[]?)await redis.GetDatabase().ScriptEvaluateAsync(
+            var operation = redis.GetDatabase().ScriptEvaluateAsync(
                 FixedWindowScript,
                 [(RedisKey)key],
                 [(RedisValue)Math.Max(1L, (long)window.TotalMilliseconds)]);
+            var timeout = TimeSpan.FromMilliseconds(Math.Clamp(options.Value.RedisOperationTimeoutMilliseconds, 50, 5000));
+            var result = (RedisResult[]?)await operation.WaitAsync(timeout, cancellationToken);
 
             if (result is null || result.Length != 2)
                 return null;
@@ -52,6 +57,11 @@ public sealed class RedisAuthRateLimitCounterStore(
         catch (OperationCanceledException)
         {
             throw;
+        }
+        catch (TimeoutException)
+        {
+            logger.LogWarning("Redis auth rate-limit counter timed out");
+            return null;
         }
         catch (Exception)
         {

@@ -43,6 +43,7 @@ public sealed class AuthenticationContainmentTests
         {
             HashKey = OtpHashKey,
             EnableDevelopmentTestAccounts = true,
+            EnableDevelopmentFixedOtp = true,
             ExposeDevelopmentOtp = true
         });
 
@@ -60,6 +61,16 @@ public sealed class AuthenticationContainmentTests
         Assert.False(disabled.IsDevelopmentTestAccount(TestAccounts.Manager));
         Assert.True(enabled.IsDevelopmentTestAccount(TestAccounts.Manager));
         Assert.False(production.IsDevelopmentTestAccount(TestAccounts.Manager));
+    }
+
+    [Fact]
+    public void Development_fixed_otp_accepts_any_valid_phone_without_a_sms_provider()
+    {
+        var service = CreateOtpService(Environments.Development, enableFixedOtp: true);
+
+        Assert.True(service.IsDevelopmentTestAccount("0912345678"));
+        Assert.True(service.CanExposeDevelopmentOtp);
+        Assert.Equal("0000", service.DevelopmentOtp);
     }
 
     [Fact]
@@ -208,7 +219,8 @@ public sealed class AuthenticationContainmentTests
 
     private static OtpSecurityService CreateOtpService(
         string environment,
-        bool enableTestAccounts = false) =>
+        bool enableTestAccounts = false,
+        bool enableFixedOtp = false) =>
         new(
             Options.Create(new OtpSettings
             {
@@ -216,7 +228,9 @@ public sealed class AuthenticationContainmentTests
                 HashKey = OtpHashKey,
                 DefaultOtp = "0000",
                 EnableDevelopmentTestAccounts = enableTestAccounts,
+                EnableDevelopmentFixedOtp = enableFixedOtp,
                 ExposeDevelopmentOtp = enableTestAccounts
+                    || enableFixedOtp
             }),
             new TestHostEnvironment(environment));
 

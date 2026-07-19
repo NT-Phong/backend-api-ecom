@@ -4472,6 +4472,10 @@ namespace Ecom.Infrastructure.Migrations
 
                     b.HasIndex("No");
 
+                    b.HasIndex("ProductId")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false AND \"IsPrimary\" = true");
+
                     b.HasIndex("ProductId", "MediaAssetId")
                         .IsUnique()
                         .HasFilter("\"IsDeleted\" = false");

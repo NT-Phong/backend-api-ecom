@@ -25,6 +25,19 @@ public static class Permissions
 
     #endregion
 
+    #region Catalog Products
+
+    public static class CatalogProducts
+    {
+        public const string Read = "catalog.products.read";
+        public const string Create = "catalog.products.create";
+        public const string Update = "catalog.products.update";
+        public const string Publish = "catalog.products.publish";
+        public const string Discontinue = "catalog.products.discontinue";
+    }
+
+    #endregion
+
     #region Roles Module
 
     public static class Roles // Admin
@@ -74,7 +87,14 @@ public static class Permissions
             new(Roles.AssignRole, "Gán vai trò cho người dùng", "Roles"),
 
             // RolePolicies
-            new(RolePolicies.Read, "Xem quyền của vai trò", "RolePolicies")
+            new(RolePolicies.Read, "Xem quyền của vai trò", "RolePolicies"),
+
+            // Catalog Products
+            new(CatalogProducts.Read, "Xem quản trị sản phẩm", "CatalogProducts"),
+            new(CatalogProducts.Create, "Tạo sản phẩm", "CatalogProducts"),
+            new(CatalogProducts.Update, "Cập nhật sản phẩm", "CatalogProducts"),
+            new(CatalogProducts.Publish, "Xuất bản sản phẩm", "CatalogProducts"),
+            new(CatalogProducts.Discontinue, "Ngừng kinh doanh sản phẩm", "CatalogProducts")
         };
     }
 }

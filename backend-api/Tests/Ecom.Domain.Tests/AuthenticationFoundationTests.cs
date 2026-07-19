@@ -1,5 +1,6 @@
 using Ecom.Domain.Entities;
 using Ecom.Domain.Enums;
+using Ecom.Domain.Extensions;
 
 namespace Ecom.Domain.Tests;
 
@@ -55,5 +56,29 @@ public sealed class AuthenticationFoundationTests
         Assert.NotNull(credential.LastFailedAt);
         Assert.Equal("bcrypt-v1", credential.AlgorithmVersion);
         credential.RecordSuccess(now.AddMinutes(1)); Assert.Null(credential.LockoutEnd);
+    }
+
+    [Theory]
+    [InlineData("0912345678")]
+    [InlineData("+84912345678")]
+    [InlineData("84 912 345 678")]
+    public void Vietnamese_phone_formats_normalize_to_one_canonical_value(string input)
+    {
+        Assert.True(VietnamesePhoneNumber.TryNormalize(input, out var normalized));
+        Assert.Equal("0912345678", normalized);
+
+        var user = new User(input, null);
+        Assert.Equal("0912345678", user.PhoneNumber);
+        Assert.Equal("0912345678", user.NormalizedPhoneNumber);
+    }
+
+    [Fact]
+    public void Basic_profile_name_does_not_mark_full_profile_complete()
+    {
+        var user = new User("0912345678", null);
+        user.SetBasicProfile("  Nguyen Van A ");
+
+        Assert.Equal("Nguyen Van A", user.FullName);
+        Assert.False(user.IsProfileCompleted);
     }
 }

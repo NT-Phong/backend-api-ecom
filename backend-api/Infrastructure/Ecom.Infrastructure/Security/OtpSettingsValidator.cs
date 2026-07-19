@@ -17,12 +17,17 @@ public sealed class OtpSettingsValidator(IHostEnvironment environment) : IValida
         if (string.IsNullOrWhiteSpace(options.HashKey) || options.HashKey.Length < 32)
             failures.Add("Otp:HashKey must be supplied by configuration and contain at least 32 characters.");
         if (!environment.IsDevelopment() &&
-            (options.EnableDevelopmentTestAccounts || options.ExposeDevelopmentOtp))
+            (options.EnableDevelopmentTestAccounts || options.EnableDevelopmentFixedOtp || options.ExposeDevelopmentOtp))
         {
             failures.Add("Development OTP/test-account options cannot be enabled outside Development.");
         }
-        if (options.ExposeDevelopmentOtp && !options.EnableDevelopmentTestAccounts)
-            failures.Add("Otp:ExposeDevelopmentOtp requires Otp:EnableDevelopmentTestAccounts.");
+        if (options.ExposeDevelopmentOtp && !options.EnableDevelopmentTestAccounts && !options.EnableDevelopmentFixedOtp)
+            failures.Add("Otp:ExposeDevelopmentOtp requires a Development OTP mode.");
+        if ((options.EnableDevelopmentTestAccounts || options.EnableDevelopmentFixedOtp) &&
+            (options.DefaultOtp.Length != options.OtpLength || !options.DefaultOtp.All(char.IsDigit)))
+        {
+            failures.Add("Otp:DefaultOtp must be numeric and match Otp:OtpLength when a Development OTP mode is enabled.");
+        }
 
         return failures.Count == 0
             ? ValidateOptionsResult.Success

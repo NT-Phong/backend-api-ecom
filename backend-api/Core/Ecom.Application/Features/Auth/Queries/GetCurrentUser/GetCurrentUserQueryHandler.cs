@@ -50,7 +50,9 @@ public class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, T
                 Policies = policies.ToList(),
                 LastLoginAt = user.LastLoginAt,
                 PhoneNumberConfirmed = user.PhoneNumberConfirmed,
-                EmailConfirmed = user.EmailConfirmed
+                EmailConfirmed = user.EmailConfirmed,
+                CanSkipProfile = string.IsNullOrWhiteSpace(user.FullName),
+                ProfileState = string.IsNullOrWhiteSpace(user.FullName) ? "BASIC_PROFILE_MISSING" : "READY"
             });
         }
         catch (Exception ex)

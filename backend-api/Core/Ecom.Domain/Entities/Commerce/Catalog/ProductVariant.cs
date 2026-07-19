@@ -75,6 +75,8 @@ public class ProductVariant : BaseEntity
 
     public void Discontinue() => Status = VariantStatus.Discontinued;
 
+    public void EnsurePricingCanBeChanged() => EnsureMutable();
+
     private void EnsureMutable()
     {
         if (Status == VariantStatus.Discontinued)

@@ -1,5 +1,6 @@
 ﻿using Ecom.Domain.Common.Interfaces;
 using System.Net;
+using Ecom.Domain.Extensions;
 
 namespace Ecom.Domain.Entities;
 
@@ -174,10 +175,8 @@ public class User : BaseEntity
 
 	public void SetPhoneNumber(string? phoneNumber)
 	{
-		PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
-		NormalizedPhoneNumber = PhoneNumber is null
-			? null
-			: new string(PhoneNumber.Where(char.IsDigit).ToArray());
+		PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : VietnamesePhoneNumber.Normalize(phoneNumber);
+		NormalizedPhoneNumber = PhoneNumber;
 	}
 
 	public void SetEmail(string? email)
@@ -211,11 +210,19 @@ public class User : BaseEntity
 
 	public void CompleteProfile(string fullName, string? email, string? address, Guid? avatarId)
 	{
-		FullName = fullName;
+		SetBasicProfile(fullName);
 		SetEmail(email);
 		Address = address;
 		AvatarId = avatarId;
 		IsProfileCompleted = true;
+	}
+
+	public void SetBasicProfile(string fullName)
+	{
+		if (string.IsNullOrWhiteSpace(fullName))
+			throw new ArgumentException("Full name is required.", nameof(fullName));
+
+		FullName = fullName.Trim();
 	}
 
 	/// <summary>

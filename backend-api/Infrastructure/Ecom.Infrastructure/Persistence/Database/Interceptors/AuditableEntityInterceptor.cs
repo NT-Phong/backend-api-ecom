@@ -60,7 +60,8 @@ public class AuditableEntityInterceptor : SaveChangesInterceptor
                 softDelete.DeletedBy = currentUserId;
             }
 
-            if (entry.State == EntityState.Modified && entry.Entity is IHasConcurrencyStamp concurrencyEntity)
+            if (entry.State == EntityState.Modified && entry.Entity is IHasConcurrencyStamp concurrencyEntity
+                && !entry.Property(nameof(IHasConcurrencyStamp.ConcurrencyStamp)).IsModified)
             {
                 concurrencyEntity.ConcurrencyStamp = Guid.NewGuid();
             }

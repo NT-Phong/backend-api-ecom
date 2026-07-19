@@ -13,6 +13,7 @@ Then choose one primary skill and only the references required by the current bo
 
 | Signal | Primary skill/context | Conditional reference |
 | --- | --- | --- |
+| Catalog Product, ProductCategory, ProductMedia, ProductVariant, VariantPrice, public Product API, Catalog backoffice lifecycle | `catalog-product-system` | Current state for progress; domain map for invariants; API-handler map for contracts; review checklist for improvement |
 | Product, Variant, Price, Inventory, Cart, Checkout, Order, Payment, Shipment, TradeInquiry | `commerce-system` | Current status for progress; entity model for invariants; relational database for EF/schema; roadmap for sequencing |
 | Controller, MediatR, validation, authorization, UnitOfWork, errors, performance | `backend-api-architecture` | API checklist or dependency/security reference matching the question |
 | Auth, JWT, password/session, roles, permissions, identity, secrets | `authentication` | `references/current-state.md`, `references/role-authorization.md`, `.agents/context/risk-map.md` |

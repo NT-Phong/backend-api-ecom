@@ -8,6 +8,7 @@ using Ecom.Application.Features.Auth.Commands.RoleManagement.DeleteRole;
 using Ecom.Application.Features.Auth.Commands.RoleManagement.UpdateRole;
 using Ecom.Application.Features.Auth.Commands.SendOtp;
 using Ecom.Application.Features.Auth.Commands.UpdateProfile;
+using Ecom.Application.Features.Auth.Commands.UpdateBasicProfile;
 using Ecom.Application.Features.Auth.Commands.UpdateUserRole;
 using Ecom.Application.Features.Auth.Commands.UserManagement.Commands.CreateUser;
 using Ecom.Application.Features.Auth.Commands.UserManagement.Commands.DeleteUser;
@@ -28,6 +29,8 @@ namespace Ecom.API.Controllers;
 /// Đăng ký và đăng nhập bằng số điện thoại + OTP
 /// </summary>
 [ApiVersion("1.0")]
+[ApiExplorerSettings(GroupName = "v1")]
+[Route("api/v{version:apiVersion}/auth")]
 public class AuthController : BaseController
 {
     private readonly ILogger<AuthController> _logger;
@@ -38,8 +41,7 @@ public class AuthController : BaseController
     }
 
     /// <summary>
-    /// Đăng ký tài khoản mới bằng số điện thoại
-    /// Sau đăng ký, user cần xác thực OTP để kích hoạt
+    /// Compatibility route. New clients should use send-otp as the single phone-first entry point.
     /// </summary>
     /// <param name="command">Thông tin đăng ký</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -114,6 +116,15 @@ public class AuthController : BaseController
     {
         var result = await Mediator.Send(command);
         return HandleResult(result);
+    }
+    /// <summary>
+    /// Lưu tên hiển thị sau OTP. Đây là bước tùy chọn và không hoàn thiện full profile.
+    /// </summary>
+    [HttpPatch("profile/basic")]
+    [Authorize(Policy = Permissions.User.Update)]
+    public async Task<IActionResult> UpdateBasicProfile([FromBody] UpdateBasicProfileCommand command, CancellationToken cancellationToken)
+    {
+        return HandleResult(await Mediator.Send(command, cancellationToken));
     }
     /// <summary>
     /// Update thông tin cá nhân người dùng

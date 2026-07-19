@@ -40,6 +40,10 @@ public class OtpSettings
     /// </summary>
     public bool EnableDevelopmentTestAccounts { get; set; }
     /// <summary>
+    /// Enables the fixed development OTP for every valid phone number. Rejected outside Development.
+    /// </summary>
+    public bool EnableDevelopmentFixedOtp { get; set; }
+    /// <summary>
     /// Allows returning a development OTP in the existing V1 DTO. Rejected outside Development.
     /// </summary>
     public bool ExposeDevelopmentOtp { get; set; }

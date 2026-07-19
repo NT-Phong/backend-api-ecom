@@ -7,6 +7,9 @@ public static class AuthRateLimitPolicyNames
     public const string OtpVerifyIp = "auth-otp-verify-ip";
     public const string RefreshIp = "auth-refresh-ip";
     public const string PasswordLoginIp = "auth-password-login-ip";
+    public const string DemoQrStartIp = "demo-qr-start-ip";
+    public const string DemoQrStatusIp = "demo-qr-status-ip";
+    public const string DemoQrApproveIp = "demo-qr-approve-ip";
     public const string RegisterDestinationDaily = "auth-register-destination-daily";
     public const string OtpSendDestinationBurst = "auth-otp-send-destination-burst";
     public const string OtpSendDestinationDaily = "auth-otp-send-destination-daily";
@@ -19,13 +22,18 @@ public static class AuthRateLimitPolicyNames
 public sealed class AuthRateLimitOptions
 {
     public const string SectionName = "AuthenticationRateLimits";
+    public AuthRateLimitBackend Backend { get; set; } = AuthRateLimitBackend.Redis;
     public string RedisKeyPrefix { get; set; } = "ecom:auth:ratelimit";
+    public int RedisOperationTimeoutMilliseconds { get; set; } = 500;
 
     public RateLimitRule RegisterIp { get; set; } = new(5, 3600);
     public RateLimitRule OtpSendIp { get; set; } = new(20, 3600);
     public RateLimitRule OtpVerifyIp { get; set; } = new(30, 900);
     public RateLimitRule RefreshIp { get; set; } = new(60, 60);
     public RateLimitRule PasswordLoginIp { get; set; } = new(30, 900);
+    public RateLimitRule DemoQrStartIp { get; set; } = new(10, 300);
+    public RateLimitRule DemoQrStatusIp { get; set; } = new(120, 60);
+    public RateLimitRule DemoQrApproveIp { get; set; } = new(20, 300);
     public RateLimitRule RegisterDestinationDaily { get; set; } = new(3, 86400);
     public RateLimitRule OtpSendDestinationBurst { get; set; } = new(3, 900);
     public RateLimitRule OtpSendDestinationDaily { get; set; } = new(10, 86400);
@@ -45,6 +53,13 @@ public sealed class AuthRateLimitOptions
         AuthRateLimitPolicyNames.PasswordLoginDevice => PasswordLoginDevice,
         _ => throw new ArgumentOutOfRangeException(nameof(policyName), policyName, "Unknown auth rate-limit policy.")
     };
+}
+
+public enum AuthRateLimitBackend
+{
+    Redis,
+    InMemory,
+    FailClosed
 }
 
 public sealed class RateLimitRule

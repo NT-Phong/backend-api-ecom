@@ -11,7 +11,7 @@ public class VerifyOtpCommandValidator : AbstractValidator<VerifyOtpCommand>
             .NotEmpty()
             .WithMessage(MessageKey.PhoneNumberRequired)
 
-            .Matches(@"^(03|05|07|08|09)\d{8}$")
+            .Must(value => Ecom.Domain.Extensions.VietnamesePhoneNumber.TryNormalize(value, out _))
             .WithMessage(MessageKey.PhoneNumberInvalid);
 
         RuleFor(x => x.OtpCode)

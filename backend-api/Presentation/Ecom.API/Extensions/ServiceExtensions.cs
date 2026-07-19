@@ -109,6 +109,9 @@ public static class ServiceExtensions
             AddIpPolicy(options, AuthRateLimitPolicyNames.OtpVerifyIp, settings.OtpVerifyIp);
             AddIpPolicy(options, AuthRateLimitPolicyNames.RefreshIp, settings.RefreshIp);
             AddIpPolicy(options, AuthRateLimitPolicyNames.PasswordLoginIp, settings.PasswordLoginIp);
+            AddIpPolicy(options, AuthRateLimitPolicyNames.DemoQrStartIp, settings.DemoQrStartIp);
+            AddIpPolicy(options, AuthRateLimitPolicyNames.DemoQrStatusIp, settings.DemoQrStatusIp);
+            AddIpPolicy(options, AuthRateLimitPolicyNames.DemoQrApproveIp, settings.DemoQrApproveIp);
         });
     }
 

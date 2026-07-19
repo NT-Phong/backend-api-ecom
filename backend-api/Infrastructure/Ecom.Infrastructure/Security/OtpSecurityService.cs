@@ -20,7 +20,7 @@ public sealed class OtpSecurityService : IOtpSecurityService
 
     public bool CanExposeDevelopmentOtp =>
         _environment.IsDevelopment() &&
-        _settings.EnableDevelopmentTestAccounts &&
+        (_settings.EnableDevelopmentTestAccounts || _settings.EnableDevelopmentFixedOtp) &&
         _settings.ExposeDevelopmentOtp;
 
     public string DevelopmentOtp => _settings.DefaultOtp;
@@ -56,8 +56,9 @@ public sealed class OtpSecurityService : IOtpSecurityService
 
     public bool IsDevelopmentTestAccount(string phoneNumber) =>
         _environment.IsDevelopment() &&
-        _settings.EnableDevelopmentTestAccounts &&
-        TestAccounts.All.Contains(phoneNumber, StringComparer.Ordinal);
+        (_settings.EnableDevelopmentFixedOtp ||
+         (_settings.EnableDevelopmentTestAccounts &&
+          TestAccounts.All.Contains(phoneNumber, StringComparer.Ordinal)));
 
     private byte[] ComputeDigest(Guid userId, OtpTokenTypeEnum purpose, string code)
     {

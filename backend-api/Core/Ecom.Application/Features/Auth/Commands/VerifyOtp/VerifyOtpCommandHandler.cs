@@ -1,5 +1,6 @@
 ﻿using Ecom.Application.Common.Configuration;
 using Ecom.Domain.Entities;
+using Ecom.Domain.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Ecom.Application.Features.Auth.Commands.VerifyOtp;
@@ -37,12 +38,15 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 	{
 		try
 		{
-			var user = await GetUserAsync(request.PhoneNumber);
+			if (!VietnamesePhoneNumber.TryNormalize(request.PhoneNumber, out var phoneNumber))
+				return TResult<VerifyOtpResult>.Failure(MessageKey.PhoneNumberRequired, ErrorCodes.BAD_REQUEST);
+
+			var user = await GetUserAsync(phoneNumber);
 			if (user == null || user.Id == Guid.Empty)
 			{
 				var missingRateLimit = await _rateLimiter.AcquireAsync(
 					AuthRateLimitPolicyNames.OtpVerifyChallenge,
-					$"missing:{request.PhoneNumber}",
+					$"missing:{phoneNumber}",
 					cancellationToken);
 				if (missingRateLimit.Status == AuthRateLimitStatus.Unavailable)
 					return TResult<VerifyOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
@@ -55,7 +59,7 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 				return TResult<VerifyOtpResult>.Failure(MessageKey.AuthenticationFailed, ErrorCodes.UNAUTHORIZED);
 
 			// Verify OTP
-			var verification = await VerifyOtpAsync(user, request, cancellationToken);
+			var verification = await VerifyOtpAsync(user, request with { PhoneNumber = phoneNumber }, cancellationToken);
 			if (verification.RateLimitStatus == AuthRateLimitStatus.Unavailable)
 				return TResult<VerifyOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
 			if (verification.RateLimitStatus == AuthRateLimitStatus.Rejected)
@@ -108,9 +112,10 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 
 	private async Task<User?> GetUserAsync(string phone)
 	{
+		var legacyInternationalPhoneNumber = "84" + phone[1..];
 		return await _unitOfWork.Repository<User>()
 			.FindOneAsync(
-				filters: [u => u.PhoneNumber == phone],
+				filters: [u => u.NormalizedPhoneNumber == phone || u.NormalizedPhoneNumber == legacyInternationalPhoneNumber],
 				includes: [u => u.Role!]);
 	}
 
@@ -201,9 +206,9 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 	private string ResolveLoginStatus(User user, bool isFirstTime)
 	{
         //  Rule 1: nếu chưa update profile → bắt buộc update (áp dụng cho ALL)
-        if (user.Role?.Code == global::Ecom.Domain.Constants.Permissions.Roles.User && !user.IsProfileCompleted)
+        if (string.IsNullOrWhiteSpace(user.FullName))
         {
-            return "REQUIRE_UPDATE_PROFILE";
+            return "OPTIONAL_BASIC_PROFILE";
         }
 
         // Rule 2: nếu đã update profile → vào app
@@ -235,6 +240,8 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 			UserId = user.Id,
 			PhoneNumber = user.PhoneNumber,
 			IsProfileCompleted = user.IsProfileCompleted,
+			CanSkipProfile = string.IsNullOrWhiteSpace(user.FullName),
+			ProfileState = string.IsNullOrWhiteSpace(user.FullName) ? "BASIC_PROFILE_MISSING" : "READY",
 			LoginStatus = loginStatus,
 			AccessToken = accessToken,
 			RefreshToken = refreshToken,

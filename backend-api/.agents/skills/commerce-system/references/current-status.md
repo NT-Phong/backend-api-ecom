@@ -31,7 +31,7 @@ The media policy tests do not use PostgreSQL and do not prove relational, outbox
 | Relational model | Broad Product/Variant/Price/Inventory and transaction-history separation exists |
 | Rich Domain Model | Batch 1 verified by solution build and 18 domain tests |
 | Media support | Source implemented; file policy verified, PostgreSQL lifecycle unverified |
-| Catalog API | Not implemented |
+| Catalog API | Source implemented: public list/detail/categories plus backoffice Product lifecycle; PostgreSQL integration verification pending |
 | Cart/checkout/order API | Not implemented |
 | Idempotency/concurrency | Planned, not implemented |
 | Status/media/outbox migration | Fresh baseline `InitialCommerceSchema` applied to Azure `ecom_dev`; PostgreSQL lifecycle verification remains pending |
@@ -43,7 +43,7 @@ Add PostgreSQL Testcontainers coverage for MediaAsset persistence, outbox atomic
 ## Known Risks
 
 1. Enum strings changed in source without a data migration.
-2. Commerce CQRS/controllers do not exist.
+2. Catalog CQRS/controllers are source-implemented, but PostgreSQL integration coverage and live API smoke verification remain open.
 3. Product publish facts must later be resolved from persisted state.
 4. Some root methods accept caller-supplied child collections to avoid changing EF navigation shape in Batch 1.
 5. Outbox conversion is implemented but defaults to disabled; PostgreSQL atomicity and an outbox processor remain unverified, and FCM is not registered.
@@ -67,3 +67,8 @@ Add PostgreSQL Testcontainers coverage for MediaAsset persistence, outbox atomic
 - Verification: `dotnet build Presentation/Ecom.API/Ecom.API.csproj --no-restore /p:UseSharedCompilation=false` passed with 0 errors; `dotnet ef migrations has-pending-model-changes` reported no changes; idempotent SQL contained 90 `CREATE TABLE` operations and no `DROP`, `DELETE`, or `TRUNCATE`.
 - Migration: `dotnet ef database update` applied `20260718084313_InitialCommerceSchema` to Azure PostgreSQL database `ecom_dev`; follow-up `dotnet ef migrations list` confirmed it as the only applied migration.
 - Remaining risk: this is a development baseline, not production/staging evidence; PostgreSQL integration coverage for relational constraints, concurrency, rollback, media lifecycle, and outbox atomicity is still missing.
+
+### 2026-07-19 - Catalog Product API source implementation
+- Source: public `GET /api/v1/products`, `GET /api/v1/products/{slug}`, and `GET /api/v1/categories`; effective Sale/Public VND price resolver; Catalog product policy checks; backoffice Product/category/media/variant/price/lifecycle commands; and forward-only VariantPrice overlap migration.
+- Verification: API build passed; Domain tests 29/29 passed; `has-pending-model-changes` reported no changes; idempotent SQL contains the `btree_gist` VariantPrice exclusion constraint.
+- Remaining risk: migration is not applied; PostgreSQL query/concurrency tests and API authorization smoke tests are not yet available because no Testcontainers fixture is configured and the configured Azure database was unreachable from this environment.
