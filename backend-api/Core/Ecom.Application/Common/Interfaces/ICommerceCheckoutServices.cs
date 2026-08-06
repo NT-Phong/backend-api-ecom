@@ -6,6 +6,7 @@ namespace Ecom.Application.Common.Interfaces;
 public interface ICartPrincipalResolver
 {
     CartPrincipal ResolveOrCreateGuestPrincipal();
+    CartPrincipal RotateGuestPrincipal();
     CartPrincipal? ResolveExistingPrincipal();
     CartPrincipal? ResolveGuestPrincipal();
     void ClearGuestPrincipal();
@@ -21,6 +22,9 @@ public interface IInventoryReservationStore
 {
     Task<TResult<IReadOnlyDictionary<Guid, LockedInventory>>> LockTrackedInventoryAsync(
         IReadOnlyCollection<InventoryLockRequest> requests, CancellationToken cancellationToken);
+
+    Task<TResult<IReadOnlyDictionary<InventoryLevelLockRequest, InventoryLevel>>> LockInventoryLevelsAsync(
+        IReadOnlyCollection<InventoryLevelLockRequest> requests, CancellationToken cancellationToken);
 }
 
 public interface IIdempotencyStore

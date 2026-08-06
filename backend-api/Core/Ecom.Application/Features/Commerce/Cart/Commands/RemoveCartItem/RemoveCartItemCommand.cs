@@ -12,8 +12,11 @@ public sealed class RemoveCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPr
     {
         var principal = principalResolver.ResolveExistingPrincipal();
         if (principal is null) return TResult.Failure(MessageKey.Unauthorized, ErrorCodes.UNAUTHORIZED);
+        var now = DateTime.UtcNow;
         var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstOrDefaultAsync(principal.UserId.HasValue ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active, cancellationToken);
         if (cart is null) return TResult.Failure("Active cart was not found.", ErrorCodes.NOT_FOUND);
+        if (cart.IsExpiredAt(now))
+            return TResult.Failure("The active cart has expired.", ErrorCodes.UNPROCESSABLE_ENTITY);
         var item = await unitOfWork.Repository<CartItem>().Query().FirstOrDefaultAsync(x => x.Id == request.CartItemId && x.CartId == cart.Id, cancellationToken);
         if (item is null) return TResult.Failure("Cart item was not found.", ErrorCodes.NOT_FOUND);
         cart.RemoveItem(item);

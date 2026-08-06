@@ -34,10 +34,13 @@ public class Order : BaseEntity, IAggregateRoot
         ICollection<OrderItem> orderItems,
         ICollection<OrderStatusHistory> history)
     {
+        var normalizedGuestTokenHash = guestTokenHash?.Trim();
         if (string.IsNullOrWhiteSpace(orderNumber) || string.IsNullOrWhiteSpace(customerPhone) ||
             string.IsNullOrWhiteSpace(recipientName) || string.IsNullOrWhiteSpace(recipientPhone) ||
             string.IsNullOrWhiteSpace(shippingAddress))
             throw new CommerceDomainException("ORDER_DETAILS_REQUIRED", "Order number, customer, recipient, and shipping details are required.");
+        if (userId.HasValue == !string.IsNullOrWhiteSpace(normalizedGuestTokenHash))
+            throw new CommerceDomainException("ORDER_OWNER_INVALID", "An order must belong to exactly one user or guest cart.");
         if (shippingAmount < 0)
             throw new CommerceDomainException("ORDER_SHIPPING_AMOUNT_INVALID", "Shipping amount cannot be negative.");
         if (placedAt == default)
@@ -51,7 +54,7 @@ public class Order : BaseEntity, IAggregateRoot
         {
             OrderNumber = orderNumber.Trim(),
             UserId = userId,
-            GuestTokenHashSnapshot = guestTokenHash?.Trim(),
+            GuestTokenHashSnapshot = normalizedGuestTokenHash,
             CustomerEmailSnapshot = customerEmail?.Trim(),
             CustomerPhoneSnapshot = customerPhone.Trim(),
             RecipientNameSnapshot = recipientName.Trim(),

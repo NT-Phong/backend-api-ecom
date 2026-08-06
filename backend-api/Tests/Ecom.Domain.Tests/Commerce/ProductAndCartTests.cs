@@ -112,6 +112,18 @@ public class ProductAndCartTests
     }
 
     [Fact]
+    public void Guest_cart_expires_only_after_its_expiry_time()
+    {
+        var now = DateTime.UtcNow;
+        var cart = Cart.CreateForGuest("guest-token-hash", now.AddMinutes(1));
+
+        Assert.False(cart.ExpireIfDue(now));
+        Assert.True(cart.ExpireIfDue(now.AddMinutes(1)));
+        Assert.Equal(CartStatus.Expired, cart.Status);
+        Assert.False(cart.ExpireIfDue(now.AddMinutes(2)));
+    }
+
+    [Fact]
     public void Cart_checkout_selected_items_keeps_unselected_lines_active()
     {
         var cart = Cart.CreateForUser(Guid.NewGuid());

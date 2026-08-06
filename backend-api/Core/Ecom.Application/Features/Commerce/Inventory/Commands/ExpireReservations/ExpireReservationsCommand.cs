@@ -1,28 +1,97 @@
+using Ecom.Application.Common.Commerce;
+using Ecom.Application.Common.Interfaces;
 using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Commerce.Inventory.Commands.ExpireReservations;
+
 public sealed record ExpireReservationsCommand : IRequest<TResult>, ITransactionalRequest;
-public sealed class ExpireReservationsCommandHandler(IUnitOfWork uow) : IRequestHandler<ExpireReservationsCommand, TResult>
+
+public sealed class ExpireReservationsCommandHandler(
+    IUnitOfWork unitOfWork,
+    IInventoryReservationStore inventoryReservationStore)
+    : IRequestHandler<ExpireReservationsCommand, TResult>
 {
-    public async Task<TResult> Handle(ExpireReservationsCommand request, CancellationToken ct)
+    public async Task<TResult> Handle(ExpireReservationsCommand request, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        var expired = await uow.Repository<InventoryReservation>().Query().Where(x => x.Status == InventoryReservationStatus.Active && x.ExpiresAt != null && x.ExpiresAt <= now).ToListAsync(ct);
-        foreach (var reservation in expired)
+        var expiredReservations = await unitOfWork.Repository<InventoryReservation>()
+            .Query()
+            .Where(x => x.Status == InventoryReservationStatus.Active && x.ExpiresAt != null && x.ExpiresAt <= now)
+            .ToListAsync(cancellationToken);
+
+        if (expiredReservations.Count == 0)
+            return TResult.Success();
+
+        var expiredReservationIds = expiredReservations.Select(x => x.Id).ToHashSet();
+        var expiredOrderItemIds = expiredReservations.Select(x => x.OrderItemId).Distinct().ToArray();
+        var expiredOrderIds = await unitOfWork.Repository<OrderItem>()
+            .QueryNoTracking()
+            .Where(x => expiredOrderItemIds.Contains(x.Id))
+            .Select(x => x.OrderId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var orderId in expiredOrderIds)
         {
-            var orderItem = await uow.Repository<OrderItem>().FindByIdAsync(reservation.OrderItemId);
-            var order = orderItem is null ? null : await uow.Repository<Order>().FindByIdAsync(orderItem.OrderId);
-            var payment = order is null ? null : await uow.Repository<Payment>().FindOneAsync([x => x.OrderId == order.Id]);
-            if (order is null || payment is null || payment.Status == PaymentStatus.Paid || order.Status != OrderStatus.Pending) continue;
-            var level = await uow.Repository<InventoryLevel>().Query().FirstAsync(x => x.InventoryItemId == reservation.InventoryItemId && x.StockLocationId == reservation.StockLocationId, ct);
-            var movement = level.Release(reservation.Quantity, now, reservation.OrderItemId, "reservation-expired"); reservation.Expire(now);
-            var history = await uow.Repository<OrderStatusHistory>().Query().Where(x => x.OrderId == order.Id).ToListAsync(ct);
+            var order = await unitOfWork.Repository<Order>().FindByIdAsync(orderId);
+            var payment = await unitOfWork.Repository<Payment>().FindOneAsync([x => x.OrderId == orderId]);
+            if (order is null || payment is null || payment.Status == PaymentStatus.Paid || order.Status != OrderStatus.Pending)
+                continue;
+
+            var orderItemIds = await unitOfWork.Repository<OrderItem>()
+                .QueryNoTracking()
+                .Where(x => x.OrderId == orderId)
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+            var activeReservations = await unitOfWork.Repository<InventoryReservation>()
+                .Query()
+                .Where(x => orderItemIds.Contains(x.OrderItemId) && x.Status == InventoryReservationStatus.Active)
+                .ToListAsync(cancellationToken);
+
+            if (activeReservations.Count == 0)
+                continue;
+
+            var levelLocks = await inventoryReservationStore.LockInventoryLevelsAsync(
+                activeReservations
+                    .Select(x => new InventoryLevelLockRequest(x.InventoryItemId, x.StockLocationId))
+                    .ToList(),
+                cancellationToken);
+            if (!levelLocks.IsSuccess)
+                return TResult.Failure(levelLocks.Error!, levelLocks.ErrorCode);
+
+            foreach (var reservation in activeReservations)
+            {
+                var levelKey = new InventoryLevelLockRequest(reservation.InventoryItemId, reservation.StockLocationId);
+                var level = levelLocks.Data[levelKey];
+                var isExpired = expiredReservationIds.Contains(reservation.Id) ||
+                    (reservation.ExpiresAt is not null && reservation.ExpiresAt <= now);
+                var reason = isExpired ? "reservation-expired" : "order-expired-reservation-release";
+
+                var movement = level.Release(reservation.Quantity, now, reservation.OrderItemId, reason);
+                if (isExpired)
+                    reservation.Expire(now);
+                else
+                    reservation.Release(now);
+
+                await unitOfWork.Repository<InventoryLevel>().UpdateAsync(level, cancellationToken);
+                await unitOfWork.Repository<InventoryReservation>().UpdateAsync(reservation, cancellationToken);
+                await unitOfWork.Repository<InventoryMovement>().InsertAsync(movement, cancellationToken);
+            }
+
+            var history = await unitOfWork.Repository<OrderStatusHistory>()
+                .Query()
+                .Where(x => x.OrderId == order.Id)
+                .ToListAsync(cancellationToken);
             order.Cancel("Reservation expired before confirmation.", null, now, history);
             var transaction = payment.Cancel("reservation-expiry", now);
-            await uow.Repository<InventoryLevel>().UpdateAsync(level, ct); await uow.Repository<InventoryReservation>().UpdateAsync(reservation, ct); await uow.Repository<InventoryMovement>().InsertAsync(movement, ct);
-            await uow.Repository<Order>().UpdateAsync(order, ct); await uow.Repository<OrderStatusHistory>().InsertRangeAsync(history.Where(x => x.CreatedAt == default), ct);
-            await uow.Repository<Payment>().UpdateAsync(payment, ct); await uow.Repository<PaymentTransaction>().InsertAsync(transaction, ct);
+
+            await unitOfWork.Repository<Order>().UpdateAsync(order, cancellationToken);
+            await unitOfWork.Repository<OrderStatusHistory>().InsertRangeAsync(
+                history.Where(x => x.CreatedAt == default), cancellationToken);
+            await unitOfWork.Repository<Payment>().UpdateAsync(payment, cancellationToken);
+            await unitOfWork.Repository<PaymentTransaction>().InsertAsync(transaction, cancellationToken);
         }
+
         return TResult.Success();
     }
 }

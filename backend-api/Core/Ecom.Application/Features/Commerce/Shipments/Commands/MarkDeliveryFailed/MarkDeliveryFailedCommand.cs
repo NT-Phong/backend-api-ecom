@@ -6,7 +6,11 @@ public sealed record MarkDeliveryFailedCommand(Guid OrderId, string Reason) : IR
 
 public sealed class MarkDeliveryFailedCommandValidator : AbstractValidator<MarkDeliveryFailedCommand>
 {
-    public MarkDeliveryFailedCommandValidator() => RuleFor(x => x.Reason).NotEmpty().MaximumLength(1000);
+    public MarkDeliveryFailedCommandValidator()
+    {
+        RuleFor(x => x.OrderId).NotEmpty();
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(1000);
+    }
 }
 
 public sealed class MarkDeliveryFailedCommandHandler(IUnitOfWork uow, ICurrentUser current)

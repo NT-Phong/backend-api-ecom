@@ -82,7 +82,11 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
             await unitOfWork.Repository<InventoryLevel>().UpdateAsync(locked.Level, cancellationToken);
         }
 
-        var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstAsync(principal.UserId.HasValue ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active, cancellationToken);
+        var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstAsync(
+            principal.UserId.HasValue
+                ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now)
+                : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now),
+            cancellationToken);
         var cartItems = await unitOfWork.Repository<CartItem>().Query().Where(x => x.CartId == cart.Id).ToListAsync(cancellationToken);
         cart.CheckoutSelectedItems(cartItems, request.CartItemIds);
         foreach (var item in cartItems.Where(x => x.IsDeleted)) await unitOfWork.Repository<CartItem>().DeleteAsync(item, cancellationToken);

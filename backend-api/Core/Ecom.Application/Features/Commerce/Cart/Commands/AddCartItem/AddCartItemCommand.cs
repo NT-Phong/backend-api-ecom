@@ -14,6 +14,7 @@ public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
 {
     public async Task<TResult<CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
         var principal = principalResolver.ResolveOrCreateGuestPrincipal();
         var variant = await unitOfWork.Repository<ProductVariant>().QueryNoTracking().FirstOrDefaultAsync(x => x.Id == request.ProductVariantId && x.Status == VariantStatus.Active, cancellationToken);
         if (variant is null || !await unitOfWork.Repository<Product>().AnyAsync([x => x.Id == variant.ProductId && x.Status == ProductStatus.Published]))
@@ -21,9 +22,19 @@ public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
 
         var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstOrDefaultAsync(
             principal.UserId.HasValue ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active, cancellationToken);
+        if (cart is not null && cart.IsExpiredAt(now))
+        {
+            if (!principal.IsGuest)
+                return TResult<CartDto>.Failure("The active cart has expired.", ErrorCodes.UNPROCESSABLE_ENTITY);
+
+            cart.Expire();
+            await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().UpdateAsync(cart, cancellationToken);
+            principal = principalResolver.RotateGuestPrincipal();
+            cart = null;
+        }
         if (cart is null)
         {
-            cart = principal.UserId.HasValue ? Ecom.Domain.Entities.Cart.CreateForUser(principal.UserId.Value) : Ecom.Domain.Entities.Cart.CreateForGuest(principal.GuestTokenHash!, DateTime.UtcNow.AddDays(30));
+            cart = principal.UserId.HasValue ? Ecom.Domain.Entities.Cart.CreateForUser(principal.UserId.Value) : Ecom.Domain.Entities.Cart.CreateForGuest(principal.GuestTokenHash!, now.AddDays(30));
             await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().InsertAsync(cart, cancellationToken);
         }
         var items = await unitOfWork.Repository<CartItem>().Query().Where(x => x.CartId == cart.Id).ToListAsync(cancellationToken);

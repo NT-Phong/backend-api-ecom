@@ -1,4 +1,5 @@
 using Ecom.Application.Common.Commerce;
+using Ecom.Domain.Entities;
 using Ecom.Infrastructure.Persistence.Database;
 
 namespace Ecom.Infrastructure.Services;
@@ -22,5 +23,30 @@ FOR UPDATE OF l").SingleOrDefaultAsync(cancellationToken);
             locked[request.ProductVariantId] = new LockedInventory(request.ProductVariantId, level.InventoryItemId, level);
         }
         return TResult<IReadOnlyDictionary<Guid, LockedInventory>>.Success(locked);
+    }
+
+    public async Task<TResult<IReadOnlyDictionary<InventoryLevelLockRequest, InventoryLevel>>> LockInventoryLevelsAsync(
+        IReadOnlyCollection<InventoryLevelLockRequest> requests, CancellationToken cancellationToken)
+    {
+        var locked = new Dictionary<InventoryLevelLockRequest, InventoryLevel>();
+        foreach (var request in requests.Distinct()
+                     .OrderBy(x => x.InventoryItemId)
+                     .ThenBy(x => x.StockLocationId))
+        {
+            var level = await db.InventoryLevels.FromSqlInterpolated($@"
+SELECT l.* FROM ""Tbl_InventoryLevel"" AS l
+WHERE l.""InventoryItemId"" = {request.InventoryItemId}
+  AND l.""StockLocationId"" = {request.StockLocationId}
+  AND l.""IsDeleted"" = false
+FOR UPDATE OF l").SingleOrDefaultAsync(cancellationToken);
+
+            if (level is null)
+                return TResult<IReadOnlyDictionary<InventoryLevelLockRequest, InventoryLevel>>.Failure(
+                    "Inventory level was not found.", ErrorCodes.NOT_FOUND);
+
+            locked[request] = level;
+        }
+
+        return TResult<IReadOnlyDictionary<InventoryLevelLockRequest, InventoryLevel>>.Success(locked);
     }
 }

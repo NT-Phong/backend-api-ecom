@@ -5,5 +5,32 @@ namespace Ecom.Infrastructure.Persistence.Database.Configurations.Commerce;
 
 public sealed class OrderConfiguration : BaseEntityConfiguration<Order>
 {
-    public override void Configure(EntityTypeBuilder<Order> b) { base.Configure(b); b.Property(x => x.OrderNumber).HasMaxLength(40).IsRequired(); b.Property(x => x.GuestTokenHashSnapshot).HasMaxLength(64); b.Property(x => x.CustomerEmailSnapshot).HasMaxLength(255); b.Property(x => x.CustomerPhoneSnapshot).HasMaxLength(20).IsRequired(); b.Property(x => x.RecipientNameSnapshot).HasMaxLength(200).IsRequired(); b.Property(x => x.RecipientPhoneSnapshot).HasMaxLength(20).IsRequired(); b.Property(x => x.ShippingAddressSnapshot).HasMaxLength(1000).IsRequired(); b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30).IsRequired(); b.Property(x => x.CurrencyCode).HasMaxLength(CommerceConstants.CurrencyCodeLength).IsFixedLength().HasDefaultValue(CommerceConstants.DefaultCurrency).IsRequired(); CommerceConfigurationSupport.Money(b.Property(x => x.SubtotalAmount)).IsRequired(); CommerceConfigurationSupport.Money(b.Property(x => x.DiscountAmount)).HasDefaultValue(0m); CommerceConfigurationSupport.Money(b.Property(x => x.ShippingAmount)).HasDefaultValue(0m); CommerceConfigurationSupport.Money(b.Property(x => x.GrandTotalAmount)).IsRequired(); CommerceConfigurationSupport.Unique(b, nameof(Order.OrderNumber)); b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull); b.HasOne<AdministrativeArea>().WithMany().HasForeignKey(x => x.AdministrativeAreaId).OnDelete(DeleteBehavior.SetNull); b.ToTable(t => t.HasCheckConstraint("CK_Order_Totals", "\"SubtotalAmount\" >= 0 AND \"DiscountAmount\" >= 0 AND \"ShippingAmount\" >= 0 AND \"GrandTotalAmount\" = \"SubtotalAmount\" - \"DiscountAmount\" + \"ShippingAmount\"")); }
+    public override void Configure(EntityTypeBuilder<Order> b)
+    {
+        base.Configure(b);
+        b.Property(x => x.OrderNumber).HasMaxLength(40).IsRequired();
+        b.Property(x => x.GuestTokenHashSnapshot).HasMaxLength(64);
+        b.Property(x => x.CustomerEmailSnapshot).HasMaxLength(255);
+        b.Property(x => x.CustomerPhoneSnapshot).HasMaxLength(20).IsRequired();
+        b.Property(x => x.RecipientNameSnapshot).HasMaxLength(200).IsRequired();
+        b.Property(x => x.RecipientPhoneSnapshot).HasMaxLength(20).IsRequired();
+        b.Property(x => x.ShippingAddressSnapshot).HasMaxLength(1000).IsRequired();
+        b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
+        b.Property(x => x.CurrencyCode).HasMaxLength(CommerceConstants.CurrencyCodeLength).IsFixedLength()
+            .HasDefaultValue(CommerceConstants.DefaultCurrency).IsRequired();
+        CommerceConfigurationSupport.Money(b.Property(x => x.SubtotalAmount)).IsRequired();
+        CommerceConfigurationSupport.Money(b.Property(x => x.DiscountAmount)).HasDefaultValue(0m);
+        CommerceConfigurationSupport.Money(b.Property(x => x.ShippingAmount)).HasDefaultValue(0m);
+        CommerceConfigurationSupport.Money(b.Property(x => x.GrandTotalAmount)).IsRequired();
+        CommerceConfigurationSupport.Unique(b, nameof(Order.OrderNumber));
+        b.HasIndex(x => new { x.UserId, x.PlacedAt }).HasDatabaseName("IX_Order_UserId_PlacedAt");
+        b.HasIndex(x => new { x.GuestTokenHashSnapshot, x.PlacedAt }).HasDatabaseName("IX_Order_GuestTokenHashSnapshot_PlacedAt");
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
+        b.HasOne<AdministrativeArea>().WithMany().HasForeignKey(x => x.AdministrativeAreaId).OnDelete(DeleteBehavior.SetNull);
+        b.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_Order_Totals", "\"SubtotalAmount\" >= 0 AND \"DiscountAmount\" >= 0 AND \"ShippingAmount\" >= 0 AND \"GrandTotalAmount\" = \"SubtotalAmount\" - \"DiscountAmount\" + \"ShippingAmount\"");
+            t.HasCheckConstraint("CK_Order_Owner", "(\"UserId\" IS NULL) <> (NULLIF(\"GuestTokenHashSnapshot\", '') IS NULL)");
+        });
+    }
 }

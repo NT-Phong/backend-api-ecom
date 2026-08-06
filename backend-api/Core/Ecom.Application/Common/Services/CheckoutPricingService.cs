@@ -16,10 +16,11 @@ public sealed class CheckoutPricingService(IUnitOfWork unitOfWork, IEffectivePri
         if (cartItemIds.Count == 0)
             return TResult<CheckoutQuote>.Failure("At least one cart item is required.", ErrorCodes.BAD_REQUEST);
 
+        var now = DateTime.UtcNow;
         var cart = await unitOfWork.Repository<Cart>().FindOneAsync(
             principal.UserId.HasValue
-                ? [x => x.UserId == principal.UserId && x.Status == CartStatus.Active]
-                : [x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active]);
+                ? [x => x.UserId == principal.UserId && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now)]
+                : [x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now)]);
         if (cart is null)
             return TResult<CheckoutQuote>.Failure("Active cart was not found.", ErrorCodes.NOT_FOUND);
 
@@ -41,7 +42,7 @@ public sealed class CheckoutPricingService(IUnitOfWork unitOfWork, IEffectivePri
         if (products.Count != variants.Select(x => x.ProductId).Distinct().Count())
             return TResult<CheckoutQuote>.Failure("One or more products are unavailable.", ErrorCodes.UNPROCESSABLE_ENTITY);
 
-        var effectivePrices = await prices.ResolveForVariantsAsync(variantIds, DateTime.UtcNow, cancellationToken);
+        var effectivePrices = await prices.ResolveForVariantsAsync(variantIds, now, cancellationToken);
         if (effectivePrices.Count != variantIds.Length)
             return TResult<CheckoutQuote>.Failure("One or more variants do not have an active price.", ErrorCodes.UNPROCESSABLE_ENTITY);
 

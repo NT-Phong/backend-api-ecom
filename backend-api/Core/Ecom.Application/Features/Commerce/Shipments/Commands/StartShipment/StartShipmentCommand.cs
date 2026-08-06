@@ -2,6 +2,17 @@ using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Commerce.Shipments.Commands.StartShipment;
 public sealed record StartShipmentCommand(Guid OrderId, string? CarrierName, string? TrackingCode) : IRequest<TResult>, ITransactionalRequest;
+
+public sealed class StartShipmentCommandValidator : AbstractValidator<StartShipmentCommand>
+{
+    public StartShipmentCommandValidator()
+    {
+        RuleFor(x => x.OrderId).NotEmpty();
+        RuleFor(x => x.CarrierName).MaximumLength(100);
+        RuleFor(x => x.TrackingCode).MaximumLength(100);
+    }
+}
+
 public sealed class StartShipmentCommandHandler(IUnitOfWork uow, ICurrentUser current) : IRequestHandler<StartShipmentCommand, TResult>
 {
     public async Task<TResult> Handle(StartShipmentCommand r, CancellationToken ct)

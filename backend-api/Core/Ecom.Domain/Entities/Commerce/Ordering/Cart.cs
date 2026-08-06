@@ -96,6 +96,18 @@ public class Cart : BaseEntity, IAggregateRoot
         AddDomainEvent(new CommerceStateChangedEvent(nameof(Cart), Id, CartStatus.Active.ToString(), Status.ToString()));
     }
 
+    public bool IsExpiredAt(DateTime now) =>
+        Status == CartStatus.Active && ExpiresAt is not null && ExpiresAt <= now;
+
+    public bool ExpireIfDue(DateTime now)
+    {
+        if (!IsExpiredAt(now))
+            return false;
+
+        Expire();
+        return true;
+    }
+
     private void EnsureOwns(CartItem item)
     {
         EnsureActive();

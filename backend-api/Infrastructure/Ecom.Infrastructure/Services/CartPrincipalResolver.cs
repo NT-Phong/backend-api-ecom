@@ -16,14 +16,22 @@ public sealed class CartPrincipalResolver(IHttpContextAccessor httpContextAccess
         var context = httpContextAccessor.HttpContext ?? throw new InvalidOperationException("No HTTP context is available.");
         var token = context.Request.Cookies[CookieName];
         if (string.IsNullOrWhiteSpace(token))
+            return RotateGuestPrincipal();
+        return new CartPrincipal(null, Hash(token));
+    }
+
+    public CartPrincipal RotateGuestPrincipal()
+    {
+        if (currentUser.IsAuthenticated && currentUser.UserId != Guid.Empty)
+            return new CartPrincipal(currentUser.UserId, null);
+
+        var context = httpContextAccessor.HttpContext ?? throw new InvalidOperationException("No HTTP context is available.");
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        context.Response.Cookies.Append(CookieName, token, new CookieOptions
         {
-            token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
-            context.Response.Cookies.Append(CookieName, token, new CookieOptions
-            {
-                HttpOnly = true, Secure = true, SameSite = SameSiteMode.Lax, Path = "/",
-                Expires = DateTimeOffset.UtcNow.AddDays(30)
-            });
-        }
+            HttpOnly = true, Secure = true, SameSite = SameSiteMode.Lax, Path = "/",
+            Expires = DateTimeOffset.UtcNow.AddDays(30)
+        });
         return new CartPrincipal(null, Hash(token));
     }
 

@@ -13,8 +13,11 @@ public sealed class ChangeCartItemQuantityCommandHandler(IUnitOfWork unitOfWork,
     {
         var principal = principalResolver.ResolveExistingPrincipal();
         if (principal is null) return TResult<CartDto>.Failure(MessageKey.Unauthorized, ErrorCodes.UNAUTHORIZED);
+        var now = DateTime.UtcNow;
         var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstOrDefaultAsync(principal.UserId.HasValue ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active, cancellationToken);
         if (cart is null) return TResult<CartDto>.Failure("Active cart was not found.", ErrorCodes.NOT_FOUND);
+        if (cart.IsExpiredAt(now))
+            return TResult<CartDto>.Failure("The active cart has expired.", ErrorCodes.UNPROCESSABLE_ENTITY);
         var item = await unitOfWork.Repository<CartItem>().Query().FirstOrDefaultAsync(x => x.Id == request.CartItemId && x.CartId == cart.Id, cancellationToken);
         if (item is null) return TResult<CartDto>.Failure("Cart item was not found.", ErrorCodes.NOT_FOUND);
         cart.ChangeQuantity(item, request.Quantity);

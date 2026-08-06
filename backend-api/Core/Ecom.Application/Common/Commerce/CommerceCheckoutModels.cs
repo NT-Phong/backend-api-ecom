@@ -21,6 +21,8 @@ public sealed record InventoryLockRequest(Guid ProductVariantId, int Quantity);
 
 public sealed record LockedInventory(Guid ProductVariantId, Guid InventoryItemId, InventoryLevel Level);
 
+public sealed record InventoryLevelLockRequest(Guid InventoryItemId, Guid StockLocationId);
+
 public enum IdempotencyBeginKind { Started, Completed, Processing, Mismatch }
 
 public sealed record IdempotencyBeginResult(IdempotencyBeginKind Kind, IdempotencyRecord Record);

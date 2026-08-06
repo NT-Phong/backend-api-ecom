@@ -12,6 +12,8 @@ public sealed class MergeGuestCartCommandHandler(IUnitOfWork uow, ICurrentUser c
         var guest = principals.ResolveGuestPrincipal(); if (guest is null) return TResult<CartDto>.Failure("Guest cart was not found.", ErrorCodes.NOT_FOUND);
         var source = await uow.Repository<Ecom.Domain.Entities.Cart>().Query().FirstOrDefaultAsync(x => x.GuestTokenHash == guest.GuestTokenHash && x.Status == CartStatus.Active, ct);
         if (source is null) return TResult<CartDto>.Failure("Guest cart was not found.", ErrorCodes.NOT_FOUND);
+        if (source.IsExpiredAt(DateTime.UtcNow))
+            return TResult<CartDto>.Failure("Guest cart has expired.", ErrorCodes.UNPROCESSABLE_ENTITY);
         var target = await uow.Repository<Ecom.Domain.Entities.Cart>().Query().FirstOrDefaultAsync(x => x.UserId == current.UserId && x.Status == CartStatus.Active, ct);
         if (target is null) { target = Ecom.Domain.Entities.Cart.CreateForUser(current.UserId); await uow.Repository<Ecom.Domain.Entities.Cart>().InsertAsync(target, ct); }
         var targetItems = await uow.Repository<CartItem>().Query().Where(x => x.CartId == target.Id).ToListAsync(ct);

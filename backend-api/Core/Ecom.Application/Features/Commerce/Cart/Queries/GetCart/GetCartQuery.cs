@@ -11,10 +11,11 @@ public sealed class GetCartQueryHandler(IUnitOfWork unitOfWork, ICartPrincipalRe
     {
         var principal = principalResolver.ResolveExistingPrincipal();
         if (principal is null) return TResult<CartDto>.Success(CartDto.Empty);
+        var now = DateTime.UtcNow;
         var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().QueryNoTracking().FirstOrDefaultAsync(
             principal.UserId.HasValue
-                ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active
-                : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active, cancellationToken);
+                ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now)
+                : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now), cancellationToken);
         if (cart is null) return TResult<CartDto>.Success(CartDto.Empty);
         var items = await unitOfWork.Repository<CartItem>().QueryNoTracking().Where(x => x.CartId == cart.Id).ToListAsync(cancellationToken);
         return TResult<CartDto>.Success(CartDtoMapper.Map(cart, items));

@@ -2,6 +2,12 @@ using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Commerce.Shipments.Commands.CompleteShipment;
 public sealed record CompleteShipmentCommand(Guid OrderId) : IRequest<TResult>, ITransactionalRequest;
+
+public sealed class CompleteShipmentCommandValidator : AbstractValidator<CompleteShipmentCommand>
+{
+    public CompleteShipmentCommandValidator() => RuleFor(x => x.OrderId).NotEmpty();
+}
+
 public sealed class CompleteShipmentCommandHandler(IUnitOfWork uow, ICurrentUser current) : IRequestHandler<CompleteShipmentCommand, TResult>
 {
     public async Task<TResult> Handle(CompleteShipmentCommand r, CancellationToken ct)

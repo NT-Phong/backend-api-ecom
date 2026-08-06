@@ -2,6 +2,12 @@ using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Commerce.Shipments.Commands.PrepareShipment;
 public sealed record PrepareShipmentCommand(Guid OrderId) : IRequest<TResult>, ITransactionalRequest;
+
+public sealed class PrepareShipmentCommandValidator : AbstractValidator<PrepareShipmentCommand>
+{
+    public PrepareShipmentCommandValidator() => RuleFor(x => x.OrderId).NotEmpty();
+}
+
 public sealed class PrepareShipmentCommandHandler(IUnitOfWork uow, ICurrentUser current) : IRequestHandler<PrepareShipmentCommand, TResult>
 {
     public async Task<TResult> Handle(PrepareShipmentCommand r, CancellationToken ct)

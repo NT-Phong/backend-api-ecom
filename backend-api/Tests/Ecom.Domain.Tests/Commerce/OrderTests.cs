@@ -37,8 +37,18 @@ public class OrderTests
         Assert.Throws<CommerceDomainException>(() => order.Confirm(null, DateTime.UtcNow, history));
     }
 
+    [Fact]
+    public void Order_requires_exactly_one_owner()
+    {
+        var now = DateTime.UtcNow;
+        OrderLineSnapshot[] snapshots = [new OrderLineSnapshot(Guid.NewGuid(), "Product", "Variant", "SKU-OWNER", 100m, 1)];
+
+        Assert.Throws<CommerceDomainException>(() => Order.Create("ORD-NO-OWNER", null, null, null, "0900000000", "Buyer", "0900000000", null, "Address", 0m, now, snapshots, new List<OrderItem>(), new List<OrderStatusHistory>()));
+        Assert.Throws<CommerceDomainException>(() => Order.Create("ORD-TWO-OWNERS", Guid.NewGuid(), "guest-hash", null, "0900000000", "Buyer", "0900000000", null, "Address", 0m, now, snapshots, new List<OrderItem>(), new List<OrderStatusHistory>()));
+    }
+
     private static Order CreateOrder(ICollection<OrderItem> items, ICollection<OrderStatusHistory> history, DateTime now) =>
-        Order.Create("ORD-001", null, null, null, "0900000000", "Buyer", "0900000000", null, "Address",
+        Order.Create("ORD-001", null, "guest-hash", null, "0900000000", "Buyer", "0900000000", null, "Address",
             30m, now,
             [new OrderLineSnapshot(Guid.NewGuid(), "Product", "Variant", "SKU-1", 100m, 2, 20m)],
             items, history);

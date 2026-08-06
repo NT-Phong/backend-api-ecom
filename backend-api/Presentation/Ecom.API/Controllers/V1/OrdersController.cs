@@ -28,7 +28,6 @@ public sealed class OrdersController : BaseController
     }
 
     [HttpPost("{orderId:guid}/cancel")]
-    [Authorize]
     public async Task<IActionResult> Cancel(Guid orderId, CancelOrderCommand command, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(command with { OrderId = orderId }, cancellationToken));
 }

@@ -2,6 +2,12 @@ using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Commerce.Orders.Commands.ConfirmOrder;
 public sealed record ConfirmOrderCommand(Guid OrderId) : IRequest<TResult>, ITransactionalRequest;
+
+public sealed class ConfirmOrderCommandValidator : AbstractValidator<ConfirmOrderCommand>
+{
+    public ConfirmOrderCommandValidator() => RuleFor(x => x.OrderId).NotEmpty();
+}
+
 public sealed class ConfirmOrderCommandHandler(IUnitOfWork uow, ICurrentUser current) : IRequestHandler<ConfirmOrderCommand, TResult>
 {
     public async Task<TResult> Handle(ConfirmOrderCommand r, CancellationToken ct)
