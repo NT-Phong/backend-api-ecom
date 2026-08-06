@@ -60,7 +60,9 @@ public sealed class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEn
 
     public async Task<bool> ExistsAsync(IEnumerable<Guid> ids)
     {
-        var idList = ids.ToList();
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0) return false;
+
         var count = await _dbSet.CountAsync(x => !x.IsDeleted && idList.Contains(x.Id));
         return count == idList.Count;
     }
@@ -185,6 +187,7 @@ public sealed class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEn
     public async Task<bool> HardDeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .IgnoreQueryFilters()
             .Where(x => x.Id == id)
             .ExecuteDeleteAsync(cancellationToken) > 0;
     }
@@ -194,7 +197,10 @@ public sealed class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEn
         var ids = entities.Select(entity => entity.Id).ToList();
         if (ids.Count > 0)
         {
-            await _dbSet.Where(entity => ids.Contains(entity.Id)).ExecuteDeleteAsync(cancellationToken);
+            await _dbSet
+                .IgnoreQueryFilters()
+                .Where(entity => ids.Contains(entity.Id))
+                .ExecuteDeleteAsync(cancellationToken);
         }
     }
 
@@ -204,7 +210,9 @@ public sealed class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEn
 
     public IQueryable<TEntity> Query(bool includeDeleted = false)
     {
-        return includeDeleted ? _dbSet.AsQueryable() : _dbSet.Where(x => !x.IsDeleted);
+        return includeDeleted
+            ? _dbSet.IgnoreQueryFilters()
+            : _dbSet;
     }
 
     public IQueryable<TEntity> QueryNoTracking(bool includeDeleted = false)

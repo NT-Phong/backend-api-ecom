@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using Ecom.Domain.Common;
 using Ecom.Domain.Interfaces.Repositories;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
@@ -51,26 +50,25 @@ public class UnitOfWork : IUnitOfWork
         return await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
-        if (_transaction != null) return;
+        if (_transaction != null) return false;
         _transaction =
             await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
-        _logger.LogInformation("Transaction started");
+        _logger.LogDebug("Transaction started");
+        return true;
     }
 
     public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
     {
+        if (_transaction is null)
+            throw new InvalidOperationException("Cannot commit because no transaction is active.");
+
+        await SaveChangesAsync(cancellationToken);
         try
         {
-            await SaveChangesAsync(cancellationToken);
-            await (_transaction?.CommitAsync(cancellationToken) ?? Task.CompletedTask);
-            _logger.LogInformation("Transaction committed");
-        }
-        catch
-        {
-            await RollbackTransactionAsync(cancellationToken);
-            throw;
+            await _transaction.CommitAsync(cancellationToken);
+            _logger.LogDebug("Transaction committed");
         }
         finally
         {
@@ -87,7 +85,7 @@ public class UnitOfWork : IUnitOfWork
         try
         {
             await (_transaction?.RollbackAsync(cancellationToken) ?? Task.CompletedTask);
-            _logger.LogInformation("Transaction rolled back");
+            _logger.LogDebug("Transaction rolled back");
         }
         finally
         {
@@ -105,15 +103,15 @@ public class UnitOfWork : IUnitOfWork
     /// </summary>
     public async Task ExecuteInTransactionAsync(Func<Task> action, CancellationToken cancellationToken = default)
     {
-        await BeginTransactionAsync(cancellationToken);
+        var ownsTransaction = await BeginTransactionAsync(cancellationToken);
         try
         {
             await action();
-            await CommitTransactionAsync(cancellationToken);
+            if (ownsTransaction) await CommitTransactionAsync(cancellationToken);
         }
         catch
         {
-            await RollbackTransactionAsync(cancellationToken);
+            if (ownsTransaction) await RollbackTransactionAsync(cancellationToken);
             throw;
         }
     }
@@ -124,16 +122,16 @@ public class UnitOfWork : IUnitOfWork
     /// </summary>
     public async Task<TResult> ExecuteInTransactionAsync<TResult>(Func<Task<TResult>> func, CancellationToken cancellationToken = default)
     {
-        await BeginTransactionAsync(cancellationToken);
+        var ownsTransaction = await BeginTransactionAsync(cancellationToken);
         try
         {
             var result = await func();
-            await CommitTransactionAsync(cancellationToken);
+            if (ownsTransaction) await CommitTransactionAsync(cancellationToken);
             return result;
         }
         catch
         {
-            await RollbackTransactionAsync(cancellationToken);
+            if (ownsTransaction) await RollbackTransactionAsync(cancellationToken);
             throw;
         }
     }
@@ -143,9 +141,9 @@ public class UnitOfWork : IUnitOfWork
     public void Dispose()
     {
         _transaction?.Dispose();
-        _context.Dispose();
+        _repositories.Clear();
         GC.SuppressFinalize(this);
-	}
+    }
 
     public void ClearChangeTracker()
     {

@@ -23,40 +23,56 @@ public class UnitOfWorkBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
         }
 
         var requestName = typeof(TRequest).Name;
+        var ownsTransaction = false;
         try
         {
-            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            ownsTransaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
             var response = await next();
 
             if (response is IResult { IsSuccess: false })
             {
-                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-                _unitOfWork.ClearChangeTracker();
+                if (ownsTransaction)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                    _unitOfWork.ClearChangeTracker();
+                }
                 return response;
             }
 
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-            _logger.LogInformation("Transaction committed for {RequestName}", requestName);
+            if (ownsTransaction)
+            {
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+                _logger.LogDebug("Transaction committed for {RequestName}", requestName);
+            }
             return response;
         }
         catch (DbUpdateConcurrencyException ex)
         {
             _logger.LogWarning(ex, "Concurrency conflict detected for {RequestName}. Rolling back transaction...", requestName);
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            _unitOfWork.ClearChangeTracker();
+            if (ownsTransaction)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                _unitOfWork.ClearChangeTracker();
+            }
             throw new ConcurrencyConflictException();
         }
         catch (OperationCanceledException)
         {
-            await _unitOfWork.RollbackTransactionAsync(CancellationToken.None);
-            _unitOfWork.ClearChangeTracker();
+            if (ownsTransaction)
+            {
+                await _unitOfWork.RollbackTransactionAsync(CancellationToken.None);
+                _unitOfWork.ClearChangeTracker();
+            }
             throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Transaction failed for {RequestName}. Rolling back...", requestName);
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            _unitOfWork.ClearChangeTracker();
+            if (ownsTransaction)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                _unitOfWork.ClearChangeTracker();
+            }
             throw;
         }
     }

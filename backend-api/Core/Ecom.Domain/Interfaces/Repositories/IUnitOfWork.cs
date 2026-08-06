@@ -17,7 +17,8 @@ public interface IUnitOfWork : IDisposable
     /// <summary>
     /// Begin a new database transaction.
     /// </summary>
-    Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+    /// <returns><c>true</c> when this caller opened the transaction; <c>false</c> when it joined an existing scope.</returns>
+    Task<bool> BeginTransactionAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Commit the current transaction (also saves changes).
@@ -30,14 +31,14 @@ public interface IUnitOfWork : IDisposable
     Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Execute an action within a transaction scope.
-    /// Automatically commits on success or rolls back on exception.
+    /// Legacy helper for existing modules. New MediatR commands must implement
+    /// ITransactionalRequest and let UnitOfWorkBehavior own the transaction.
     /// </summary>
     Task ExecuteInTransactionAsync(Func<Task> action, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Execute a function within a transaction scope and return the result.
-    /// Automatically commits on success or rolls back on exception.
+    /// Legacy helper for existing modules. New MediatR commands must implement
+    /// ITransactionalRequest and let UnitOfWorkBehavior own the transaction.
     /// </summary>
     Task<TResult> ExecuteInTransactionAsync<TResult>(Func<Task<TResult>> func, CancellationToken cancellationToken = default);
 
