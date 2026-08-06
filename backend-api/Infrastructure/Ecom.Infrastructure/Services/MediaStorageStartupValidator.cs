@@ -6,7 +6,7 @@ namespace Ecom.Infrastructure.Services;
 public sealed class MediaStorageStartupValidator(IHostEnvironment environment,
     IOptions<MediaStorageOptions> storage,
     IOptions<MediaProcessingOptions> processing,
-    IStorageService mediaStorage) : IHostedService
+    IServiceScopeFactory scopeFactory) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -16,6 +16,8 @@ public sealed class MediaStorageStartupValidator(IHostEnvironment environment,
             throw new InvalidOperationException("Production media storage requires Azure with Managed Identity AccountUrl.");
         if (!processing.Value.Enabled || string.IsNullOrWhiteSpace(processing.Value.ClamAvHost))
             throw new InvalidOperationException("Production media processing requires an enabled ClamAV worker.");
+        using var scope = scopeFactory.CreateScope();
+        var mediaStorage = scope.ServiceProvider.GetRequiredService<IStorageService>();
         await mediaStorage.EnsureReadyAsync(cancellationToken);
     }
 

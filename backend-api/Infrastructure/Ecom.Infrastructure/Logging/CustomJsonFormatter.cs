@@ -13,6 +13,7 @@ public class CustomJsonFormatter : ITextFormatter
     private static readonly List<Regex> FallbackPatterns = new();
     private static bool _patternsInitialized = false;
     private static bool _fallbackInitialized = false;
+    private static bool _includeExceptionDetails;
     private static readonly object _lockObject = new();
 
     public static void InitializePatterns(IConfiguration configuration)
@@ -25,6 +26,7 @@ public class CustomJsonFormatter : ITextFormatter
 
             var patterns = configuration.GetSection("Serilog:SensitiveDataPatterns").Get<string[]>()
                 ?? GetDefaultPatterns();
+            _includeExceptionDetails = configuration.GetValue<bool>("Serilog:IncludeExceptionDetails");
 
             foreach (var pattern in patterns)
             {
@@ -95,7 +97,9 @@ public class CustomJsonFormatter : ITextFormatter
         //WriteProperty(jsonWriter, "error", FilterSensitiveData(GetPropertyValue(logEvent, "ErrorMessage")));
         WriteProperty(jsonWriter, "error", logEvent.Exception?.GetType().Name);
         WriteProperty(jsonWriter, "trace-id", GetPropertyValue(logEvent, "TraceId"));
-        WriteProperty(jsonWriter, "detail", "");
+        WriteProperty(jsonWriter, "detail", _includeExceptionDetails
+            ? FilterSensitiveData(logEvent.Exception?.Message)
+            : "");
 
 
         jsonWriter.WriteEndObject();
