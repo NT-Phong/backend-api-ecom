@@ -74,6 +74,19 @@ public sealed class AuthenticationContainmentTests
     }
 
     [Fact]
+    public void Development_configured_test_phone_narrows_fixed_otp_bypass_to_that_phone()
+    {
+        var service = CreateOtpService(
+            Environments.Development,
+            enableTestAccounts: true,
+            testPhoneNumber: TestAccounts.Admin);
+
+        Assert.True(service.IsDevelopmentTestAccount(TestAccounts.Admin));
+        Assert.False(service.IsDevelopmentTestAccount(TestAccounts.Manager));
+        Assert.True(service.CanExposeDevelopmentOtp);
+    }
+
+    [Fact]
     public async Task Missing_sms_provider_is_explicitly_fail_closed()
     {
         var sender = new SmsSender();
@@ -220,13 +233,15 @@ public sealed class AuthenticationContainmentTests
     private static OtpSecurityService CreateOtpService(
         string environment,
         bool enableTestAccounts = false,
-        bool enableFixedOtp = false) =>
+        bool enableFixedOtp = false,
+        string? testPhoneNumber = null) =>
         new(
             Options.Create(new OtpSettings
             {
                 OtpLength = 4,
                 HashKey = OtpHashKey,
                 DefaultOtp = "0000",
+                TestPhoneNumber = testPhoneNumber ?? string.Empty,
                 EnableDevelopmentTestAccounts = enableTestAccounts,
                 EnableDevelopmentFixedOtp = enableFixedOtp,
                 ExposeDevelopmentOtp = enableTestAccounts

@@ -54,11 +54,24 @@ public sealed class OtpSecurityService : IOtpSecurityService
                FixedTimeEquals(suppliedCode, protectedOrLegacyCode);
     }
 
-    public bool IsDevelopmentTestAccount(string phoneNumber) =>
-        _environment.IsDevelopment() &&
-        (_settings.EnableDevelopmentFixedOtp ||
-         (_settings.EnableDevelopmentTestAccounts &&
-          TestAccounts.All.Contains(phoneNumber, StringComparer.Ordinal)));
+    public bool IsDevelopmentTestAccount(string phoneNumber)
+    {
+        if (!_environment.IsDevelopment())
+            return false;
+
+        if (_settings.EnableDevelopmentFixedOtp)
+            return true;
+
+        if (!_settings.EnableDevelopmentTestAccounts)
+            return false;
+
+        // A configured account narrows the bypass to one deterministic local test identity.
+        // The legacy TestAccounts list remains the fallback for test harnesses that omit it.
+        var configuredPhone = _settings.TestPhoneNumber?.Trim();
+        return !string.IsNullOrWhiteSpace(configuredPhone)
+            ? string.Equals(phoneNumber, configuredPhone, StringComparison.Ordinal)
+            : TestAccounts.All.Contains(phoneNumber, StringComparer.Ordinal);
+    }
 
     private byte[] ComputeDigest(Guid userId, OtpTokenTypeEnum purpose, string code)
     {
