@@ -21,7 +21,7 @@ public sealed class DocumentService : IDocumentService
             if ((long)info.Width * info.Height > 40_000_000)
                 throw new InvalidDataException("Image dimensions exceed the thumbnail safety limit.");
             using var image = await Image.LoadAsync(originalStream, cancellationToken);
-            image.Mutate(x => x.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(thumbnailWidth, thumbnailWidth) }));
+            image.Mutate(x => x.AutoOrient().Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(thumbnailWidth, thumbnailWidth) }));
             var output = new MemoryStream();
             await image.SaveAsync(output, new WebpEncoder { Quality = thumbnailQuality }, cancellationToken);
             output.Position = 0;

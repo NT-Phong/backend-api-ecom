@@ -11,6 +11,12 @@ public sealed class LocalStorageService(IWebHostEnvironment environment) : IStor
     private const string PublicArea = "public";
     private const string PrivateArea = "private";
 
+    public Task EnsureReadyAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
     public string GetPublicFileUrl(string storageKey)
     {
         var key = NormalizeKey(storageKey);
@@ -28,7 +34,7 @@ public sealed class LocalStorageService(IWebHostEnvironment environment) : IStor
         return Task.FromResult(stream);
     }
 
-    public async Task<string> UploadToQuarantineAsync(Stream fileStream, string safeExtension,
+    public async Task<string> UploadToQuarantineAsync(Stream fileStream, string safeExtension, string contentType,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(fileStream);
@@ -65,7 +71,7 @@ public sealed class LocalStorageService(IWebHostEnvironment environment) : IStor
         return Task.FromResult(targetKey);
     }
 
-    public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
+    public Task DeleteIfExistsAsync(string storageKey, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var path = GetPhysicalPath(storageKey);

@@ -11,13 +11,13 @@ public sealed class MediaFileService(IFileUploadPolicy policy, IStorageService s
     {
         var metadata = await policy.ValidateAsync(stream, fileName, claimedContentType, sizeBytes, intent, cancellationToken);
         stream.Position = 0;
-        var key = await storage.UploadToQuarantineAsync(stream, metadata.SafeExtension, cancellationToken);
+        var key = await storage.UploadToQuarantineAsync(stream, metadata.SafeExtension, metadata.ContentType, cancellationToken);
         return new StoredMediaUpload(key, metadata);
     }
 
     public Task<string> PromoteAsync(string quarantineKey, MediaVisibility visibility,
         CancellationToken cancellationToken = default) => storage.PromoteAsync(quarantineKey, visibility, cancellationToken);
 
-    public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default) =>
-        storage.DeleteAsync(storageKey, cancellationToken);
+    public Task DeleteIfExistsAsync(string storageKey, CancellationToken cancellationToken = default) =>
+        storage.DeleteIfExistsAsync(storageKey, cancellationToken);
 }

@@ -1,6 +1,7 @@
 using Ecom.Application.Common.Interfaces;
 using Ecom.Application.Common.Models;
 using Ecom.Domain.Enums;
+using SixLabors.ImageSharp;
 
 namespace Ecom.Infrastructure.Services;
 
@@ -43,9 +44,30 @@ public sealed class FileUploadPolicy : IFileUploadPolicy
             throw new InvalidDataException("File extension, declared content type, and file signature do not match.");
 
         EnsureAllowed(intent, detected.MediaType, detected.ContentType);
+        if (detected.MediaType == MediaType.Image)
+            await EnsureSafeImageAsync(stream, originalPosition, cancellationToken);
         var visibility = intent == MediaUploadIntent.ProductImage ? MediaVisibility.Public : MediaVisibility.Restricted;
         return new ValidatedMediaUpload(Path.GetFileName(fileName), detected.ContentType, detected.Extension,
             sizeBytes, detected.MediaType, visibility);
+    }
+
+    private static async Task EnsureSafeImageAsync(Stream stream, long originalPosition, CancellationToken cancellationToken)
+    {
+        stream.Position = 0;
+        try
+        {
+            var info = await Image.IdentifyAsync(stream, cancellationToken);
+            if (info is null || info.Width <= 0 || info.Height <= 0 || (long)info.Width * info.Height > 40_000_000)
+                throw new InvalidDataException("Image dimensions exceed the upload safety limit.");
+        }
+        catch (Exception ex) when (ex is UnknownImageFormatException or InvalidImageContentException)
+        {
+            throw new InvalidDataException("Image content cannot be decoded.", ex);
+        }
+        finally
+        {
+            stream.Position = originalPosition;
+        }
     }
 
     private static (string ContentType, string Extension, MediaType MediaType) Detect(ReadOnlySpan<byte> header)

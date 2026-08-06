@@ -3,6 +3,32 @@ namespace Ecom.Domain.Tests.Commerce;
 public class MediaTests
 {
     [Fact]
+    public void Pending_product_image_keeps_its_intended_public_visibility()
+    {
+        var media = MediaAsset.CreatePending("quarantine/image.jpg", "image.jpg", "image/jpeg", 128,
+            MediaType.Image, MediaVisibility.Restricted, MediaUploadIntent.ProductImage, MediaVisibility.Public);
+
+        Assert.Equal(MediaUploadIntent.ProductImage, media.UploadIntent);
+        Assert.Equal(MediaVisibility.Public, media.TargetVisibility);
+        Assert.Equal(MediaVisibility.Restricted, media.Visibility);
+    }
+
+    [Fact]
+    public void Pending_media_claim_and_retry_respect_the_scan_lease()
+    {
+        var now = DateTime.UtcNow;
+        var media = MediaAsset.CreatePending("quarantine/image.jpg", "image.jpg", "image/jpeg", 128,
+            MediaType.Image, MediaVisibility.Restricted);
+
+        Assert.True(media.TryClaimScan(now, TimeSpan.FromMinutes(5)));
+        Assert.False(media.TryClaimScan(now.AddMinutes(1), TimeSpan.FromMinutes(5)));
+        media.ScheduleScanRetry(now.AddMinutes(10));
+        Assert.Equal(1, media.ScanAttemptCount);
+        Assert.False(media.TryClaimScan(now.AddMinutes(9), TimeSpan.FromMinutes(5)));
+        Assert.True(media.TryClaimScan(now.AddMinutes(10), TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
     public void Media_must_be_clean_before_becoming_public()
     {
         var media = MediaAsset.CreatePending("quarantine/image.jpg", "image.jpg", "image/jpeg", 128,

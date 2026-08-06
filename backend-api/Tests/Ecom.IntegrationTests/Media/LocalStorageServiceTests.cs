@@ -15,7 +15,7 @@ public class LocalStorageServiceTests
         {
             var storage = new LocalStorageService(new TestEnvironment(root));
             await using var stream = new MemoryStream([1, 2, 3]);
-            var quarantine = await storage.UploadToQuarantineAsync(stream, ".png");
+            var quarantine = await storage.UploadToQuarantineAsync(stream, ".png", "image/png");
             var publicKey = await storage.PromoteAsync(quarantine, MediaVisibility.Public);
 
             Assert.StartsWith("/media/", storage.GetPublicFileUrl(publicKey));
