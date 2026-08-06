@@ -28,7 +28,7 @@ Core/Ecom.Domain/Entities/Commerce/Catalog/
 Core/Ecom.Domain/Entities/Commerce/Pricing/VariantPrice.cs
 Core/Ecom.Application/Features/Catalog/
 Core/Ecom.Application/Common/{Interfaces,Services}/
-Presentation/Ecom.API/Controllers/V1/{Products,Categories,CatalogProducts}Controller.cs
+Presentation/Ecom.API/Controllers/V1/{Products,Categories,CatalogProducts,CatalogCategories,CatalogProductOptions}Controller.cs
 Infrastructure/Ecom.Infrastructure/Persistence/Database/Configurations/Commerce/{Catalog,Pricing}/
 Infrastructure/Ecom.Infrastructure/Migrations/20260719110000_AddVariantPriceOverlapConstraint.cs
 Infrastructure/Ecom.Infrastructure/Migrations/20260719114222_AddProductMediaPrimaryConstraint.cs
@@ -40,7 +40,8 @@ Tests/Ecom.Domain.Tests/Commerce/ProductAndCartTests.cs
 - Classify as public read, backoffice command, domain invariant, persistence/migration, or progress review before reading code.
 - Trace only `Controller -> command/query -> validator -> handler/service -> aggregate -> configuration/test`.
 - Keep public endpoints anonymous and limited to public facts. Never expose management DTOs, raw price history, private media information, or permissions through storefront endpoints.
-- Keep controllers thin, commands transactional through `ITransactionalRequest`, handled failures in `TResult`, and state changes in Domain methods.
+- Keep controllers thin, commands transactional through `ITransactionalRequest`, handled failures in `TResult`, and state changes in Domain methods. The transaction behavior is the single commit point; Catalog handlers never call `SaveChangesAsync` or explicit transaction APIs.
+- For new/refactored Catalog use cases, use one request, validator where applicable, and handler per folder. Existing grouped legacy handlers are migration targets, not templates.
 - Require `ConcurrencyStamp` on every Product mutation. On `409`, refetch management detail; never blindly replay.
 - Use `IEffectivePriceResolver` for public list, detail, and publish eligibility. Do not duplicate precedence in handlers.
 - Mutate Product categories/media through Product methods and persisted child collections. Do not add a navigation graph only for a handler.

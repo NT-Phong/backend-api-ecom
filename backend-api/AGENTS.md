@@ -38,9 +38,14 @@ Infrastructure -> Application/Domain abstractions
 ## Backend Standards
 
 - Keep controllers thin; use MediatR commands/queries and FluentValidation.
+- Organize new Application work by use case: `Features/<BoundedContext>/<Concern>/(Commands|Queries)/<UseCase>/` with one request, validator when applicable, and handler per use case. Do not add grouped multi-command handlers.
 - Put business invariants and state transitions in Domain methods.
+- Handlers orchestrate authorization, database facts/ownership, aggregate methods or focused services, persistence tracking, and `TResult`; do not mutate aggregate state property-by-property.
 - Use existing `TResult`, `ApiResponse`, `MessageKey`, and `ErrorCodes` conventions.
-- Use UnitOfWork/transactions for multi-write commerce operations.
+- New mutation requests implement `ITransactionalRequest`. `UnitOfWorkBehavior` owns the transaction and the single normal commit point; handlers must not call `SaveChangesAsync`, begin/commit/rollback, or `ExecuteInTransactionAsync`.
+- Queries never implement `ITransactionalRequest`; default to `QueryNoTracking()` and separate public read DTOs from management DTOs.
+- `[EnableUnitOfWork]` and `ExecuteInTransactionAsync` are legacy compatibility mechanisms. Do not use them in new code; migrate existing consumers in bounded batches.
+- Do not call external services while a database transaction is open. Persist first; use post-commit/outbox patterns for durable side effects.
 - Keep one Commerce entity and one EF configuration per file.
 - Keep cross-aggregate references ID-based; avoid large bidirectional navigation graphs.
 - Never trust client price, stock, discount, payment result, or order totals.
@@ -59,6 +64,8 @@ Keep requirements, decisions, and integration in the main task. Delegate only in
 ## Verification
 
 Run verification in proportion to risk and record exact commands/results. A blocked or skipped check is not a pass. For Commerce, follow `.agents/skills/commerce-system/references/implementation-roadmap.md`; never apply a migration without explicit approval and staging evidence.
+
+For transaction changes, add behavior tests for non-transactional reads, successful commit, handled `TResult` rollback, exception rollback, concurrency, and nested ownership; use PostgreSQL integration tests for real rollback/constraint claims.
 
 ## Final Response
 

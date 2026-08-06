@@ -1,6 +1,6 @@
 # Commerce Current Status
 
-Last source review: 2026-07-18
+Last source review: 2026-08-06
 
 ## Verified Evidence
 
@@ -32,13 +32,13 @@ The media policy tests do not use PostgreSQL and do not prove relational, outbox
 | Rich Domain Model | Batch 1 verified by solution build and 18 domain tests |
 | Media support | Source implemented; file policy verified, PostgreSQL lifecycle unverified |
 | Catalog API | Source implemented: public list/detail/categories plus backoffice Product lifecycle; PostgreSQL integration verification pending |
-| Cart/checkout/order API | Not implemented |
-| Idempotency/concurrency | Planned, not implemented |
+| Cart/checkout/order API | Source implemented: user/guest Cart, address CRUD, checkout preview, CreateOrder, ownership reads, cancellation, payment, shipment, and reservation expiry; PostgreSQL/API runtime verification remains pending |
+| Idempotency/concurrency | Source implemented for CreateOrder; PostgreSQL replay/race/rollback verification remains pending |
 | Status/media/outbox migration | Fresh baseline `InitialCommerceSchema` applied to Azure `ecom_dev`; PostgreSQL lifecycle verification remains pending |
 
 ## Active Gate
 
-Add PostgreSQL Testcontainers coverage for MediaAsset persistence, outbox atomicity, cleanup idempotency, and storage/DB rollback before treating the applied schema as verified for production.
+Run the PostgreSQL integration suite against an explicitly configured dedicated external test database for MediaAsset persistence, outbox atomicity, cleanup idempotency, and storage/DB rollback before treating the applied schema as verified for production. Docker/Testcontainers are not part of this repository's test strategy.
 
 ## Known Risks
 
@@ -71,4 +71,9 @@ Add PostgreSQL Testcontainers coverage for MediaAsset persistence, outbox atomic
 ### 2026-07-19 - Catalog Product API source implementation
 - Source: public `GET /api/v1/products`, `GET /api/v1/products/{slug}`, and `GET /api/v1/categories`; effective Sale/Public VND price resolver; Catalog product policy checks; backoffice Product/category/media/variant/price/lifecycle commands; and forward-only VariantPrice overlap migration.
 - Verification: API build passed; Domain tests 29/29 passed; `has-pending-model-changes` reported no changes; idempotent SQL contains the `btree_gist` VariantPrice exclusion constraint.
-- Remaining risk: migration is not applied; PostgreSQL query/concurrency tests and API authorization smoke tests are not yet available because no Testcontainers fixture is configured and the configured Azure database was unreachable from this environment.
+- Remaining risk: migration is not applied; PostgreSQL query/concurrency tests and API authorization smoke tests require an approved dedicated external test database that is reachable from the verification environment.
+
+### 2026-08-06 - Cart-to-Checkout-to-Order source implementation
+- Source: Cart and address ownership flows, server-calculated checkout preview, idempotent CreateOrder with a PostgreSQL lock store, order/payment/shipment lifecycle handlers, reservation expiry, guest order ownership, and forward-only idempotency/guest-ownership migrations.
+- Local verification: `dotnet build Ecom.sln --no-restore` completed with 0 warnings and 0 errors; `dotnet test Ecom.sln --no-build --no-restore` completed with 40 Domain and 52 Integration tests passed.
+- Remaining risk: 16 PostgreSQL/Catalog API integration tests were skipped because the dedicated test database environment variables were absent. This is source/local evidence only; no migration was applied and no staging or production claim is made.

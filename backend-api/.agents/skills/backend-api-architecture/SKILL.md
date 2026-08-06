@@ -15,6 +15,7 @@ Read `AGENTS.md` and `.agents/context/task-router.md`. Identify the smallest rou
 - Dependency direction or refactoring boundary: `references/dependency-boundaries.md` and `references/clean-architecture-rules.md`.
 - Security, auth, privacy, or secret handling: `references/security-review.md` plus `.agents/context/risk-map.md`.
 - Planned implementation and verification: `references/execution-workflow.md`.
+- CQRS, handler, transaction ownership, and test conventions: `references/cqrs-unit-of-work-standard.md`.
 - Commerce behavior or schema: also use `commerce-system`, loading only its matching reference.
 
 ## Workflow
@@ -30,7 +31,9 @@ Read `AGENTS.md` and `.agents/context/task-router.md`. Identify the smallest rou
 
 - Keep versioned controllers thin and use MediatR requests.
 - Use FluentValidation and stable `TResult`/`ApiResponse` errors.
-- Use `[EnableUnitOfWork]` for atomic multi-write operations according to repository patterns.
+- New mutations implement `ITransactionalRequest`; `UnitOfWorkBehavior` owns begin/commit/rollback and the single normal `SaveChangesAsync` call.
+- Use one request, validator where applicable, and handler per use case. Keep queries non-transactional and no-tracking by default.
+- `[EnableUnitOfWork]` and `ExecuteInTransactionAsync` are legacy bridges only; do not introduce new consumers.
 - Keep HTTP and Infrastructure concerns out of Domain.
 - Add abstractions only for a real boundary, duplication, or testability need.
 - Use PostgreSQL integration tests for constraints, concurrency, and migrations.

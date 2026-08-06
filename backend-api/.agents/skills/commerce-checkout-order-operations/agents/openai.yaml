@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commerce Checkout Operations"
+  short_description: "Trace and evolve Cart to Order safely"
+  default_prompt: "Use $commerce-checkout-order-operations to analyze and safely implement this Cart, checkout, order, payment, or shipment task."
