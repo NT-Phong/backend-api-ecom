@@ -20,12 +20,17 @@ public static class DependencyInjection
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
         });
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
-        services.AddScoped<ICommerceMediaService, Common.Services.CommerceMediaService>();
+        services.AddScoped<IMediaAccessService, Common.Services.MediaAccessService>();
+        services.AddScoped<Common.Services.MediaUploadOrchestrator>();
         services.AddScoped<INotificationService, Common.Services.NotificationService>();
         services.AddScoped<IProductMediaReader, Common.Services.ProductMediaReader>();
 
         services.AddScoped<IEffectivePriceResolver, Common.Services.EffectivePriceResolver>();
+        services.AddScoped<ICheckoutPricingService, Common.Services.CheckoutPricingService>();
         services.AddScoped<ICatalogProductAccessService, Common.Services.CatalogProductAccessService>();
+        services.AddScoped<Features.Catalog.Products.Services.ICatalogProductMutationService,
+            Features.Catalog.Products.Services.CatalogProductMutationService>();
+        services.AddScoped<Features.Catalog.Categories.CatalogCategoryCommandService>();
 		services.AddScoped<IAuthenticationSessionEngine, Common.Services.AuthenticationSessionEngine>();
         services.AddScoped<IUserAuthorizationSnapshotService, Common.Services.UserAuthorizationSnapshotService>();
 

@@ -21,7 +21,9 @@ public static class RoleSeeder
             // 1. Seed default roles
             var defaultRoles = new List<(string Code, string Name, string Description, int Priority, bool IsSystemRole)>
             {
+                (Roles.SystemAdmin, "System Admin", "Quản trị hệ thống cấp cao", 0, true),
                 (Roles.Admin, "Admin", "Quản trị hệ thống", 1, true),
+                (Roles.Manager, "Manager", "Quản lý catalog", 50, true),
                 (Roles.User, "Người dùng mới", "Người dùng tham khảo", 200, true)
             };
 
@@ -65,9 +67,15 @@ public static class RoleSeeder
 
                     // Admin gets all policies; User only gets User.Read and User.Update
                     bool isGranted = false;
-                    if (role.Code == Roles.Admin)
+                    if (role.Code is Roles.SystemAdmin or Roles.Admin)
                     {
                         isGranted = true;
+                    }
+                    else if (role.Code == Roles.Manager)
+                    {
+                        isGranted = p.StartsWith("catalog.", StringComparison.Ordinal) || p.StartsWith("media.", StringComparison.Ordinal)
+                            || p.StartsWith("orders.", StringComparison.Ordinal) || p.StartsWith("payments.", StringComparison.Ordinal)
+                            || p.StartsWith("shipments.", StringComparison.Ordinal);
                     }
                     else if (role.Code == Roles.User)
                     {

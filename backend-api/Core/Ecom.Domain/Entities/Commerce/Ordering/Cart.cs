@@ -70,6 +70,25 @@ public class Cart : BaseEntity, IAggregateRoot
         AddDomainEvent(new CommerceStateChangedEvent(nameof(Cart), Id, CartStatus.Active.ToString(), Status.ToString()));
     }
 
+    public void CheckoutSelectedItems(ICollection<CartItem> items, IEnumerable<Guid> cartItemIds)
+    {
+        EnsureActive();
+        ArgumentNullException.ThrowIfNull(items);
+        var selectedIds = cartItemIds?.Distinct().ToHashSet() ?? throw new ArgumentNullException(nameof(cartItemIds));
+        if (selectedIds.Count == 0)
+            throw new CommerceDomainException("CART_ITEMS_REQUIRED", "At least one cart item is required.");
+
+        var selected = items.Where(x => x.CartId == Id && !x.IsDeleted && selectedIds.Contains(x.Id)).ToList();
+        if (selected.Count != selectedIds.Count)
+            throw new CommerceDomainException("CART_ITEM_NOT_FOUND", "One or more cart items do not belong to this active cart.");
+
+        foreach (var item in selected)
+            item.IsDeleted = true;
+
+        if (!items.Any(x => x.CartId == Id && !x.IsDeleted))
+            MarkConverted();
+    }
+
     public void Expire()
     {
         EnsureActive();

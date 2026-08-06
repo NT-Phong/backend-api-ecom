@@ -31,6 +31,15 @@ public class InventoryLevel : BaseEntity
         AddDomainEvent(new InventoryChangedEvent(InventoryItemId, StockLocationId, InventoryMovementType.Allocate, quantity));
     }
 
+    public InventoryMovement Reserve(decimal quantity, DateTime occurredAt, Guid orderItemId)
+    {
+        if (orderItemId == Guid.Empty)
+            throw new CommerceDomainException("INVENTORY_RESERVATION_ORDER_ITEM_REQUIRED", "An order item is required.");
+        Reserve(quantity);
+        return InventoryMovement.Create(InventoryItemId, StockLocationId, InventoryMovementType.Allocate,
+            quantity, occurredAt, orderItemId);
+    }
+
     public void Release(decimal quantity)
     {
         if (quantity <= 0 || quantity > ReservedQuantity)

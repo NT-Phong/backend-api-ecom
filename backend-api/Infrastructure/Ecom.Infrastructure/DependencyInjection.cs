@@ -37,6 +37,8 @@ public static class DependencyInjection
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<OtpSettings>(configuration.GetSection(OtpSettings.SectionName));
         services.Configure<AuthRateLimitOptions>(configuration.GetSection(AuthRateLimitOptions.SectionName));
+        services.Configure<MediaStorageOptions>(configuration.GetSection(MediaStorageOptions.SectionName));
+        services.Configure<MediaProcessingOptions>(configuration.GetSection(MediaProcessingOptions.SectionName));
         services.AddSingleton<IValidateOptions<DemoQrLoginOptions>, DemoQrLoginOptionsValidator>();
         services.AddOptions<DemoQrLoginOptions>()
             .Bind(configuration.GetSection(DemoQrLoginOptions.SectionName))
@@ -91,6 +93,10 @@ public static class DependencyInjection
         // Repositories
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ICartPrincipalResolver, CartPrincipalResolver>();
+        services.AddScoped<IInventoryReservationStore, InventoryReservationStore>();
+        services.AddScoped<IIdempotencyStore, IdempotencyStore>();
+        services.AddSingleton<IOrderNumberGenerator, OrderNumberGenerator>();
 
         // Auto-register repository implementations
         services.RegisAllService(new[] { "Ecom.Infrastructure", "Ecom.Application" });
@@ -99,10 +105,17 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IDateTimeService, DateTimeService>();
         services.AddScoped<IHelperService, HelperService>();
-        services.AddScoped<IStorageService, LocalStorageService>();
+        if (string.Equals(configuration[$"{MediaStorageOptions.SectionName}:Provider"], "Azure", StringComparison.OrdinalIgnoreCase))
+            services.AddScoped<IStorageService, AzureBlobStorageService>();
+        else
+            services.AddScoped<IStorageService, LocalStorageService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IFileUploadPolicy, FileUploadPolicy>();
         services.AddScoped<IMediaFileService, MediaFileService>();
+        services.AddSingleton<IMalwareScanner, ClamAvMalwareScanner>();
+        services.AddHostedService<MediaStorageStartupValidator>();
+        services.AddHostedService<MediaProcessingWorker>();
+        services.AddHostedService<ReservationExpiryWorker>();
 
         // Authentication & Security Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();

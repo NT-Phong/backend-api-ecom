@@ -3,6 +3,7 @@ public class Order : BaseEntity, IAggregateRoot
 {
     public string OrderNumber { get; private set; } = string.Empty;
     public Guid? UserId { get; private set; }
+    public string? GuestTokenHashSnapshot { get; private set; }
     public string? CustomerEmailSnapshot { get; private set; }
     public string CustomerPhoneSnapshot { get; private set; } = string.Empty;
     public string RecipientNameSnapshot { get; private set; } = string.Empty;
@@ -20,6 +21,7 @@ public class Order : BaseEntity, IAggregateRoot
     public static Order Create(
         string orderNumber,
         Guid? userId,
+        string? guestTokenHash,
         string? customerEmail,
         string customerPhone,
         string recipientName,
@@ -49,6 +51,7 @@ public class Order : BaseEntity, IAggregateRoot
         {
             OrderNumber = orderNumber.Trim(),
             UserId = userId,
+            GuestTokenHashSnapshot = guestTokenHash?.Trim(),
             CustomerEmailSnapshot = customerEmail?.Trim(),
             CustomerPhoneSnapshot = customerPhone.Trim(),
             RecipientNameSnapshot = recipientName.Trim(),

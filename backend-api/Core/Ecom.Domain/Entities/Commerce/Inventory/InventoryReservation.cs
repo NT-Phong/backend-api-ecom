@@ -35,6 +35,12 @@ public class InventoryReservation : BaseEntity
         Status = InventoryReservationStatus.Consumed;
     }
 
+    public void ConfirmHold()
+    {
+        EnsureActive();
+        ExpiresAt = null;
+    }
+
     public void Release(DateTime releasedAt)
     {
         EnsureActive();

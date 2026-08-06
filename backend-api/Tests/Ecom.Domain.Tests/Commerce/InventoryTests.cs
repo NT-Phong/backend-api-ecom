@@ -35,4 +35,12 @@ public class InventoryTests
         var reservation = InventoryReservation.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 2, expiry);
         Assert.Throws<CommerceDomainException>(() => reservation.Expire(expiry.AddSeconds(-1)));
     }
+
+    [Fact]
+    public void Confirmed_reservation_hold_no_longer_has_an_expiry()
+    {
+        var reservation = InventoryReservation.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 2, DateTime.UtcNow.AddMinutes(30));
+        reservation.ConfirmHold();
+        Assert.Null(reservation.ExpiresAt);
+    }
 }

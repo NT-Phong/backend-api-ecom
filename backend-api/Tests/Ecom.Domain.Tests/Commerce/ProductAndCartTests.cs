@@ -48,6 +48,22 @@ public class ProductAndCartTests
     }
 
     [Fact]
+    public void Published_product_returns_to_review_when_public_content_changes()
+    {
+        var product = Product.Create(Guid.NewGuid(), "Local product", "local-product");
+        var publishedAt = DateTime.UtcNow.AddMinutes(-1);
+        product.SubmitForReview();
+        product.Publish(publishedAt, true, true, true, true);
+
+        var changedAt = DateTime.UtcNow;
+        product.ReturnToReviewIfPublished(changedAt);
+
+        Assert.Equal(ProductStatus.Review, product.Status);
+        Assert.Equal(changedAt, product.UnpublishedAt);
+        Assert.Equal(publishedAt, product.PublishedAt);
+    }
+
+    [Fact]
     public void Variant_price_requires_a_valid_effective_window()
     {
         var variantId = Guid.NewGuid();
@@ -93,5 +109,20 @@ public class ProductAndCartTests
     {
         Assert.Throws<CommerceDomainException>(() => Cart.CreateForUser(Guid.Empty));
         Assert.Throws<CommerceDomainException>(() => Cart.CreateForGuest(" ", DateTime.UtcNow.AddHours(1)));
+    }
+
+    [Fact]
+    public void Cart_checkout_selected_items_keeps_unselected_lines_active()
+    {
+        var cart = Cart.CreateForUser(Guid.NewGuid());
+        var items = new List<CartItem>();
+        cart.AddItem(items, Guid.NewGuid(), 1);
+        cart.AddItem(items, Guid.NewGuid(), 2);
+
+        cart.CheckoutSelectedItems(items, [items[0].Id]);
+
+        Assert.Equal(CartStatus.Active, cart.Status);
+        Assert.True(items[0].IsDeleted);
+        Assert.False(items[1].IsDeleted);
     }
 }

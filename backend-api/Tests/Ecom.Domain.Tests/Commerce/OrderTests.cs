@@ -38,7 +38,7 @@ public class OrderTests
     }
 
     private static Order CreateOrder(ICollection<OrderItem> items, ICollection<OrderStatusHistory> history, DateTime now) =>
-        Order.Create("ORD-001", null, null, "0900000000", "Buyer", "0900000000", null, "Address",
+        Order.Create("ORD-001", null, null, null, "0900000000", "Buyer", "0900000000", null, "Address",
             30m, now,
             [new OrderLineSnapshot(Guid.NewGuid(), "Product", "Variant", "SKU-1", 100m, 2, 20m)],
             items, history);
