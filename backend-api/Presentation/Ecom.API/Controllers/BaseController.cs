@@ -25,6 +25,7 @@ public abstract class BaseController : ControllerBase
             ErrorCodes.UNAUTHORIZED => Unauthorized(ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
             ErrorCodes.FORBIDDEN => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
             ErrorCodes.ALREADY_EXISTS => Conflict(ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
+            ErrorCodes.UNPROCESSABLE_ENTITY => StatusCode(StatusCodes.Status422UnprocessableEntity, ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
             ErrorCodes.TOO_MANY_REQUESTS => StatusCode(StatusCodes.Status429TooManyRequests, ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
             ErrorCodes.EXTERNAL_SERVICE_ERROR => StatusCode(StatusCodes.Status502BadGateway, ApiResponse<T>.Fail(MessageKey.AuthDependencyUnavailable, result.ErrorCode)),
             ErrorCodes.SERVICE_UNAVAILABLE => StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<T>.Fail(MessageKey.AuthDependencyUnavailable, result.ErrorCode)),
