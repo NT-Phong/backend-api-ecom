@@ -11,4 +11,8 @@ public sealed class CategoriesController : BaseController
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(new GetPublicCategoriesQuery(), cancellationToken));
+
+    [HttpGet("{slug}")]
+    public async Task<IActionResult> GetBySlug(string slug, CancellationToken cancellationToken) =>
+        HandleResult(await Mediator.Send(new GetPublicCategoryBySlugQuery(slug), cancellationToken));
 }

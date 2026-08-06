@@ -1,4 +1,5 @@
 using Ecom.Application.Features.Catalog.Common;
+using Ecom.Application.Features.Catalog.Products.Services;
 using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Catalog.Commands.CreateVariantPrice;
@@ -18,22 +19,22 @@ public sealed class CreateVariantPriceCommandValidator : AbstractValidator<Creat
     }
 }
 
-public sealed class CreateVariantPriceCommandHandler(IUnitOfWork unitOfWork, ICatalogProductAccessService access)
+public sealed class CreateVariantPriceCommandHandler(IUnitOfWork unitOfWork, ICatalogProductMutationService mutation)
     : IRequestHandler<CreateVariantPriceCommand, TResult<VariantPriceManagementResult>>
 {
     public async Task<TResult<VariantPriceManagementResult>> Handle(CreateVariantPriceCommand request, CancellationToken cancellationToken)
     {
-        var authorization = access.Ensure(Permissions.CatalogProducts.Update); if (!authorization.IsSuccess) return TResult<VariantPriceManagementResult>.Failure(authorization.Error!, authorization.ErrorCode);
-        var product = await unitOfWork.Repository<Product>().FindByIdAsync(request.ProductId);
-        if (product is null) return TResult<VariantPriceManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
-        var version = CatalogCommandSupport.EnsureVersion(product, request.ConcurrencyStamp);
-        if (version is not null) return CatalogCommandSupport.Failure<VariantPriceManagementResult>(version);
+        var loaded = await mutation.LoadAsync(request.ProductId, request.ConcurrencyStamp,
+            Permissions.CatalogProducts.Update, cancellationToken);
+        if (!loaded.IsSuccess) return CatalogCommandSupport.Failure<VariantPriceManagementResult>(loaded);
+        var product = loaded.Data;
         product.EnsureContentCanBeChanged();
         var variant = await unitOfWork.Repository<ProductVariant>().FindByIdAsync(request.VariantId);
         if (variant is null || variant.ProductId != request.ProductId) return TResult<VariantPriceManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
         variant.EnsurePricingCanBeChanged();
         if (request.PriceListId.HasValue && !await unitOfWork.Repository<PriceList>().ExistsAsync(request.PriceListId.Value))
             return TResult<VariantPriceManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
+        product.ReturnToReviewIfPublished(DateTime.UtcNow);
         var price = VariantPrice.Create(variant.Id, request.Amount, request.PriceType, request.EffectiveFrom,
             request.EffectiveTo, request.PriceListId, request.CurrencyCode, request.MinQuantity);
         await unitOfWork.Repository<VariantPrice>().InsertAsync(price, cancellationToken);

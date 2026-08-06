@@ -1,4 +1,5 @@
 using Ecom.Application.Features.Catalog.Common;
+using Ecom.Application.Features.Catalog.Products.Services;
 using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Catalog.Commands.ReplaceProductCategories;
@@ -19,21 +20,20 @@ public sealed class ReplaceProductCategoriesCommandValidator : AbstractValidator
     }
 }
 
-public sealed class ReplaceProductCategoriesCommandHandler(IUnitOfWork unitOfWork, ICatalogProductAccessService access)
+public sealed class ReplaceProductCategoriesCommandHandler(IUnitOfWork unitOfWork, ICatalogProductMutationService mutation)
     : IRequestHandler<ReplaceProductCategoriesCommand, TResult<ProductManagementResult>>
 {
     public async Task<TResult<ProductManagementResult>> Handle(ReplaceProductCategoriesCommand request, CancellationToken cancellationToken)
     {
-        var authorization = access.Ensure(Permissions.CatalogProducts.Update);
-        if (!authorization.IsSuccess) return CatalogCommandSupport.Failure<ProductManagementResult>(authorization);
-        var product = await unitOfWork.Repository<Product>().FindByIdAsync(request.ProductId);
-        if (product is null) return TResult<ProductManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
-        var version = CatalogCommandSupport.EnsureVersion(product, request.ConcurrencyStamp);
-        if (version is not null) return CatalogCommandSupport.Failure<ProductManagementResult>(version);
+        var loaded = await mutation.LoadAsync(request.ProductId, request.ConcurrencyStamp,
+            Permissions.CatalogProducts.Update, cancellationToken);
+        if (!loaded.IsSuccess) return CatalogCommandSupport.Failure<ProductManagementResult>(loaded);
+        var product = loaded.Data;
         var requestedIds = request.Categories.Select(x => x.CategoryId).ToArray();
         var actualCount = await unitOfWork.Repository<Category>().QueryNoTracking().CountAsync(x => requestedIds.Contains(x.Id), cancellationToken);
         if (actualCount != requestedIds.Length) return TResult<ProductManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
 
+        product.ReturnToReviewIfPublished(DateTime.UtcNow);
         var existing = await unitOfWork.Repository<ProductCategory>().FindAsync([x => x.ProductId == product.Id]);
         var removed = existing.ToList();
         var replacements = product.ReplaceCategories(existing,

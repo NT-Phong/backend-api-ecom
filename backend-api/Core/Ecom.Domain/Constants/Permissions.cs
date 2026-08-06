@@ -25,6 +25,31 @@ public static class Permissions
 
     #endregion
 
+    #region Media
+
+    public static class Media
+    {
+        public const string Upload = "media.upload";
+        public const string Read = "media.read";
+        public const string Delete = "media.delete";
+        public const string Manage = "media.manage";
+    }
+
+    #endregion
+
+    #region Catalog Categories
+
+    public static class CatalogCategories
+    {
+        public const string Read = "catalog.categories.read";
+        public const string Create = "catalog.categories.create";
+        public const string Update = "catalog.categories.update";
+        public const string Publish = "catalog.categories.publish";
+        public const string Deactivate = "catalog.categories.deactivate";
+    }
+
+    #endregion
+
     #region Catalog Products
 
     public static class CatalogProducts
@@ -34,6 +59,22 @@ public static class Permissions
         public const string Update = "catalog.products.update";
         public const string Publish = "catalog.products.publish";
         public const string Discontinue = "catalog.products.discontinue";
+    }
+
+    public static class Orders
+    {
+        public const string Read = "orders.read";
+        public const string Manage = "orders.manage";
+    }
+
+    public static class Payments
+    {
+        public const string Verify = "payments.verify";
+    }
+
+    public static class Shipments
+    {
+        public const string Manage = "shipments.manage";
     }
 
     #endregion
@@ -49,7 +90,9 @@ public static class Permissions
         public const string AssignRole = "roles.assign_role";
 
         // Role Codes (used for seeding and authorization)
+        public const string SystemAdmin = "SYSTEM_ADMIN";
         public const string Admin = "ADMIN";
+        public const string Manager = "MANAGER";
         public const string User = "USER";
     }
 
@@ -94,7 +137,20 @@ public static class Permissions
             new(CatalogProducts.Create, "Tạo sản phẩm", "CatalogProducts"),
             new(CatalogProducts.Update, "Cập nhật sản phẩm", "CatalogProducts"),
             new(CatalogProducts.Publish, "Xuất bản sản phẩm", "CatalogProducts"),
-            new(CatalogProducts.Discontinue, "Ngừng kinh doanh sản phẩm", "CatalogProducts")
+            new(CatalogProducts.Discontinue, "Ngừng kinh doanh sản phẩm", "CatalogProducts"),
+            new(Media.Upload, "Tải ảnh sản phẩm", "Media"),
+            new(Media.Read, "Xem metadata media", "Media"),
+            new(Media.Delete, "Xóa media chưa sử dụng", "Media"),
+            new(Media.Manage, "Quản trị toàn bộ media", "Media")
+            ,new(Orders.Read, "Xem và tra cứu đơn hàng", "Orders")
+            ,new(Orders.Manage, "Quản lý trạng thái đơn hàng", "Orders")
+            ,new(Payments.Verify, "Xác minh thanh toán", "Payments")
+            ,new(Shipments.Manage, "Quản lý giao hàng", "Shipments")
+            ,new(CatalogCategories.Read, "Xem quản trị danh mục", "CatalogCategories")
+            ,new(CatalogCategories.Create, "Tạo danh mục", "CatalogCategories")
+            ,new(CatalogCategories.Update, "Cập nhật danh mục", "CatalogCategories")
+            ,new(CatalogCategories.Publish, "Xuất bản danh mục", "CatalogCategories")
+            ,new(CatalogCategories.Deactivate, "Ẩn danh mục", "CatalogCategories")
         };
     }
 }

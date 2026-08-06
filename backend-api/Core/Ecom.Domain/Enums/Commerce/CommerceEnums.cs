@@ -3,19 +3,21 @@ namespace Ecom.Domain.Enums;
 public enum AdministrativeAreaLevel { Province, District, Ward }
 public enum PublicStatus { Draft, Verified, Published, Hidden }
 public enum ContactType { Phone, Email, Zalo, Website }
-public enum CatalogStatus { Draft, Published, Hidden }
+public enum CatalogStatus { Draft, Published, Paused, Hidden }
 public enum ProductStatus { Draft, Review, Published, Paused, Discontinued }
 public enum VariantStatus { Active, Paused, Discontinued }
 public enum InventoryMode { NotTracked, Tracked, Preorder }
 public enum MediaType { Image, Video, Document }
 public enum MediaVisibility { Public, Internal, Restricted }
 public enum MediaScanStatus { Pending, Clean, Rejected, Failed }
+public enum MediaUploadIntent { ProductImage, TradeInquiryAttachment, BankTransferProof }
 public enum PriceListStatus { Draft, Active, Inactive, Expired }
 public enum PriceType { Public, Sale, B2B }
 public enum PromotionType { Percentage, FixedAmount, FreeShipping }
 public enum PromotionStatus { Draft, Active, Paused, Expired }
 public enum CouponStatus { Draft, Active, Paused, Expired }
 public enum InventoryReservationStatus { Active, Consumed, Released, Expired }
+public enum IdempotencyStatus { Processing, Completed }
 public enum InventoryMovementType { Receive, Allocate, Release, Adjust, Ship, Return }
 public enum CartStatus { Active, Converted, Expired }
 public enum OrderStatus { Pending, Confirmed, Preparing, Shipping, Completed, Cancelled, DeliveryFailed }

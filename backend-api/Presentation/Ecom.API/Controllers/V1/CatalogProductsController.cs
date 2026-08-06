@@ -1,11 +1,11 @@
 using Ecom.Application.Features.Catalog.Commands.ChangeProductLifecycle;
 using Ecom.Application.Features.Catalog.Commands.ChangeProductVariantLifecycle;
-using Ecom.Application.Features.Catalog.Commands.CreateProduct;
+using Ecom.Application.Features.Catalog.Products.Commands.CreateProduct;
 using Ecom.Application.Features.Catalog.Commands.CreateVariantPrice;
 using Ecom.Application.Features.Catalog.Commands.ManageProductMedia;
 using Ecom.Application.Features.Catalog.Commands.ManageProductVariants;
 using Ecom.Application.Features.Catalog.Commands.ReplaceProductCategories;
-using Ecom.Application.Features.Catalog.Commands.UpdateProductDetails;
+using Ecom.Application.Features.Catalog.Products.Commands.UpdateProductDetails;
 using Ecom.Application.Features.Catalog.Queries.GetCatalogProductById;
 using Ecom.Application.Features.Catalog.Queries.GetCatalogProductList;
 using Microsoft.AspNetCore.Authorization;
@@ -110,5 +110,10 @@ public sealed class CatalogProductsController : BaseController
     [HttpPost("{productId:guid}/discontinue")]
     [Authorize(Policy = Permissions.CatalogProducts.Discontinue)]
     public async Task<IActionResult> Discontinue(Guid productId, [FromBody] DiscontinueProductCommand command, CancellationToken cancellationToken) =>
+        HandleResult(await Mediator.Send(command with { ProductId = productId }, cancellationToken));
+
+    [HttpDelete("{productId:guid}")]
+    [Authorize(Policy = Permissions.CatalogProducts.Discontinue)]
+    public async Task<IActionResult> Delete(Guid productId, [FromBody] DiscontinueProductCommand command, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(command with { ProductId = productId }, cancellationToken));
 }

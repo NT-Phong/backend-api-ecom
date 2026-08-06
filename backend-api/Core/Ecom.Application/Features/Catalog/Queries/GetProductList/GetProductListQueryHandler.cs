@@ -18,23 +18,7 @@ public sealed class GetProductListQueryHandler(
         var categories = unitOfWork.Repository<Category>().QueryNoTracking();
 
         var asOfUtc = DateTime.UtcNow;
-        var activeVariants = unitOfWork.Repository<ProductVariant>().QueryNoTracking()
-            .Where(x => x.Status == VariantStatus.Active)
-            .Select(x => new VariantRow(x.Id, x.ProductId));
-        var effectiveVariantPrices =
-            from candidate in effectivePriceResolver.QueryEffectivePriceCandidates(asOfUtc)
-            join variant in activeVariants on candidate.ProductVariantId equals variant.Id
-            group new { candidate, variant.ProductId } by new { variant.ProductId, candidate.ProductVariantId } into prices
-            select new ProductVariantPriceRow(prices.Key.ProductId,
-                prices.OrderBy(x => x.candidate.PriceType == PriceType.Sale ? 0 : 1)
-                    .ThenByDescending(x => x.candidate.EffectiveFrom)
-                    .ThenBy(x => x.candidate.VariantPriceId)
-                    .Select(x => x.candidate.Amount)
-                    .First());
-        var productPrices =
-            from price in effectiveVariantPrices
-            group price by price.ProductId into prices
-            select new ProductPriceRow(prices.Key, prices.Min(x => x.Amount));
+        var productPrices = effectivePriceResolver.QueryEffectiveProductPrices(asOfUtc);
 
         var query =
             from product in products
@@ -59,7 +43,12 @@ public sealed class GetProductListQueryHandler(
         if (!string.IsNullOrWhiteSpace(request.CategorySlug))
         {
             var slug = request.CategorySlug.Trim();
-            query = query.Where(x => x.CategorySlug == slug);
+            var matchingProductIds =
+                from mapping in mappings
+                join category in categories on mapping.CategoryId equals category.Id
+                where category.Slug == slug && category.Status == CatalogStatus.Published
+                select mapping.ProductId;
+            query = query.Where(x => matchingProductIds.Contains(x.Id));
         }
         if (request.ProducerId.HasValue)
             query = query.Where(x => x.ProducerId == request.ProducerId.Value);
@@ -96,7 +85,4 @@ public sealed class GetProductListQueryHandler(
     private sealed record ProductRow(Guid Id, string Slug, string Name, string? ShortDescription, DateTime? PublishedAt,
         Guid ProducerId, string ProducerCode, string ProducerName, string? ProducerDescription, string? ProducerWebsiteUrl,
         Guid CategoryId, string CategoryName, string CategorySlug, int CategoryDisplayOrder, decimal FromPrice);
-    private sealed record VariantRow(Guid Id, Guid ProductId);
-    private sealed record ProductVariantPriceRow(Guid ProductId, decimal Amount);
-    private sealed record ProductPriceRow(Guid ProductId, decimal Amount);
 }

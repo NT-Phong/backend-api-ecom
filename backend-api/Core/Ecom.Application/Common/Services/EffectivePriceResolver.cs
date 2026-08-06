@@ -45,4 +45,25 @@ public sealed class EffectivePriceResolver(IUnitOfWork unitOfWork) : IEffectiveP
             select new EffectiveVariantPrice(price.Id, price.ProductVariantId, price.Amount, price.CurrencyCode,
                 price.PriceType, price.EffectiveFrom);
     }
+
+    public IQueryable<EffectiveProductPrice> QueryEffectiveProductPrices(DateTime asOfUtc)
+    {
+        var activeVariants = unitOfWork.Repository<ProductVariant>().QueryNoTracking()
+            .Where(x => x.Status == VariantStatus.Active)
+            .Select(x => new { x.Id, x.ProductId });
+
+        var effectiveVariantPrices =
+            from candidate in QueryEffectivePriceCandidates(asOfUtc)
+            join variant in activeVariants on candidate.ProductVariantId equals variant.Id
+            group new { candidate, variant.ProductId } by new { variant.ProductId, candidate.ProductVariantId } into prices
+            select new { prices.Key.ProductId, Price = prices.OrderBy(x => x.candidate.PriceType == PriceType.Sale ? 0 : 1)
+                .ThenByDescending(x => x.candidate.EffectiveFrom)
+                .ThenBy(x => x.candidate.VariantPriceId)
+                .Select(x => x.candidate.Amount)
+                .First() };
+
+        return from price in effectiveVariantPrices
+               group price by price.ProductId into prices
+               select new EffectiveProductPrice(prices.Key, prices.Min(x => x.Price), CommerceConstants.DefaultCurrency);
+    }
 }

@@ -146,6 +146,109 @@ public class Product : BaseEntity, IAggregateRoot
 
     public void EnsureContentCanBeChanged() => EnsureNotDiscontinued();
 
+    public void ReturnToReviewIfPublished(DateTime changedAt)
+    {
+        EnsureNotDiscontinued();
+        if (Status != ProductStatus.Published)
+            return;
+
+        if (changedAt == default)
+            throw new CommerceDomainException("PRODUCT_CHANGE_TIME_REQUIRED", "A content change time is required.");
+
+        ChangeStatus(ProductStatus.Review);
+        UnpublishedAt = changedAt;
+    }
+
+    public ProductOption AddOption(ICollection<ProductOption> options, string code, string name, int displayOrder)
+    {
+        EnsureNotDiscontinued();
+        if (options.Any(x => string.Equals(x.Code, code.Trim(), StringComparison.OrdinalIgnoreCase)))
+            throw new CommerceDomainException("PRODUCT_OPTION_DUPLICATE", "Product option code must be unique.");
+        var option = ProductOption.Create(Id, code, name, displayOrder);
+        options.Add(option);
+        return option;
+    }
+
+    public void UpdateOption(ICollection<ProductOption> options, Guid optionId, string name, int displayOrder)
+    {
+        EnsureNotDiscontinued();
+        var option = options.SingleOrDefault(x => x.Id == optionId)
+            ?? throw new CommerceDomainException("PRODUCT_OPTION_NOT_FOUND", "Product option was not found.");
+        option.Update(name, displayOrder);
+    }
+
+    public IReadOnlyList<ProductOptionValue> RemoveOption(ICollection<ProductOption> options,
+        ICollection<ProductOptionValue> values, IReadOnlyCollection<ProductVariantOptionValue> mappings, Guid optionId)
+    {
+        EnsureNotDiscontinued();
+        var option = options.SingleOrDefault(x => x.Id == optionId)
+            ?? throw new CommerceDomainException("PRODUCT_OPTION_NOT_FOUND", "Product option was not found.");
+        var optionValues = values.Where(x => x.ProductOptionId == optionId).ToList();
+        if (mappings.Any(x => optionValues.Select(value => value.Id).Contains(x.ProductOptionValueId)))
+            throw new CommerceDomainException("PRODUCT_OPTION_IN_USE", "An option used by a variant cannot be removed.");
+        foreach (var value in optionValues) values.Remove(value);
+        options.Remove(option);
+        return optionValues;
+    }
+
+    public ProductOptionValue AddOptionValue(ICollection<ProductOption> options, ICollection<ProductOptionValue> values,
+        Guid optionId, string value, int displayOrder)
+    {
+        EnsureNotDiscontinued();
+        var option = options.SingleOrDefault(x => x.Id == optionId)
+            ?? throw new CommerceDomainException("PRODUCT_OPTION_NOT_FOUND", "Product option was not found.");
+        if (values.Any(x => x.ProductOptionId == option.Id && string.Equals(x.Value, value.Trim(), StringComparison.OrdinalIgnoreCase)))
+            throw new CommerceDomainException("PRODUCT_OPTION_VALUE_DUPLICATE", "Product option value must be unique.");
+        var result = ProductOptionValue.Create(option.Id, value, displayOrder);
+        values.Add(result);
+        return result;
+    }
+
+    public void UpdateOptionValue(ICollection<ProductOption> options, ICollection<ProductOptionValue> values,
+        Guid optionId, Guid valueId, string value, int displayOrder)
+    {
+        EnsureNotDiscontinued();
+        if (options.All(x => x.Id != optionId)) throw new CommerceDomainException("PRODUCT_OPTION_NOT_FOUND", "Product option was not found.");
+        var target = values.SingleOrDefault(x => x.Id == valueId && x.ProductOptionId == optionId)
+            ?? throw new CommerceDomainException("PRODUCT_OPTION_VALUE_NOT_FOUND", "Product option value was not found.");
+        if (values.Any(x => x.Id != target.Id && x.ProductOptionId == optionId && string.Equals(x.Value, value.Trim(), StringComparison.OrdinalIgnoreCase)))
+            throw new CommerceDomainException("PRODUCT_OPTION_VALUE_DUPLICATE", "Product option value must be unique.");
+        target.Update(value, displayOrder);
+    }
+
+    public ProductOptionValue RemoveOptionValue(ICollection<ProductOption> options, ICollection<ProductOptionValue> values,
+        IReadOnlyCollection<ProductVariantOptionValue> mappings, Guid optionId, Guid valueId)
+    {
+        EnsureNotDiscontinued();
+        if (options.All(x => x.Id != optionId))
+            throw new CommerceDomainException("PRODUCT_OPTION_NOT_FOUND", "Product option was not found.");
+        var target = values.SingleOrDefault(x => x.Id == valueId && x.ProductOptionId == optionId)
+            ?? throw new CommerceDomainException("PRODUCT_OPTION_VALUE_NOT_FOUND", "Product option value was not found.");
+        if (mappings.Any(x => x.ProductOptionValueId == valueId))
+            throw new CommerceDomainException("PRODUCT_OPTION_VALUE_IN_USE", "An option value used by a variant cannot be removed.");
+        values.Remove(target);
+        return target;
+    }
+
+    public IReadOnlyList<ProductVariantOptionValue> ReplaceVariantOptionValues(ICollection<ProductVariant> variants,
+        ICollection<ProductOption> options, ICollection<ProductOptionValue> values, ICollection<ProductVariantOptionValue> mappings,
+        Guid variantId, IReadOnlyCollection<Guid> valueIds)
+    {
+        EnsureNotDiscontinued();
+        if (variants.All(x => x.Id != variantId)) throw new CommerceDomainException("PRODUCT_VARIANT_NOT_FOUND", "Product variant was not found.");
+        if (valueIds.Count != valueIds.Distinct().Count()) throw new CommerceDomainException("VARIANT_OPTION_VALUE_DUPLICATE", "Variant option values must be unique.");
+        var selected = values.Where(x => valueIds.Contains(x.Id)).ToList();
+        if (selected.Count != valueIds.Count || selected.Any(x => options.All(o => o.Id != x.ProductOptionId)))
+            throw new CommerceDomainException("VARIANT_OPTION_VALUE_INVALID", "Variant option values do not belong to this product.");
+        if (selected.Select(x => x.ProductOptionId).Distinct().Count() != selected.Count)
+            throw new CommerceDomainException("VARIANT_OPTION_VALUE_CONFLICT", "A variant can select only one value per option.");
+        var old = mappings.Where(x => x.ProductVariantId == variantId).ToList();
+        foreach (var item in old) mappings.Remove(item);
+        var replacements = selected.Select(x => ProductVariantOptionValue.Create(variantId, x.Id)).ToList();
+        foreach (var item in replacements) mappings.Add(item);
+        return replacements;
+    }
+
     public Guid RenewConcurrencyStamp()
     {
         ConcurrencyStamp = Guid.NewGuid();

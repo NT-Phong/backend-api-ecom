@@ -5,12 +5,19 @@ public class MediaAsset : BaseEntity
     public string OriginalFileName { get; private set; } = string.Empty;
     public string ContentType { get; private set; } = string.Empty;
     public long SizeBytes { get; private set; }
+    public MediaUploadIntent UploadIntent { get; private set; }
+    public MediaVisibility TargetVisibility { get; private set; }
     public MediaType MediaType { get; private set; }
     public string? AltText { get; private set; }
     public MediaVisibility Visibility { get; private set; }
     public MediaScanStatus ScanStatus { get; private set; }
     public DateTime? ScannedAt { get; private set; }
     public string? ScanFailureReason { get; private set; }
+    public string? ThumbnailStorageKey { get; private set; }
+    public string? Sha256 { get; private set; }
+    public int ScanAttemptCount { get; private set; }
+    public DateTime? NextScanAttemptAt { get; private set; }
+    public DateTime? ScanLeaseExpiresAt { get; private set; }
 
     public bool IsPubliclyUsable => Visibility == MediaVisibility.Public && ScanStatus == MediaScanStatus.Clean;
 
@@ -21,6 +28,8 @@ public class MediaAsset : BaseEntity
         long sizeBytes,
         MediaType mediaType,
         MediaVisibility visibility,
+        MediaUploadIntent uploadIntent = MediaUploadIntent.ProductImage,
+        MediaVisibility? targetVisibility = null,
         string? altText = null)
     {
         if (string.IsNullOrWhiteSpace(storageKey) || string.IsNullOrWhiteSpace(originalFileName) ||
@@ -35,6 +44,8 @@ public class MediaAsset : BaseEntity
             OriginalFileName = Path.GetFileName(originalFileName.Trim()),
             ContentType = contentType.Trim().ToLowerInvariant(),
             SizeBytes = sizeBytes,
+            UploadIntent = uploadIntent,
+            TargetVisibility = targetVisibility ?? visibility,
             MediaType = mediaType,
             AltText = altText?.Trim(),
             Visibility = visibility,
@@ -60,6 +71,36 @@ public class MediaAsset : BaseEntity
         ChangeVisibility(visibility);
     }
 
+    public void SetThumbnailStorageKey(string? thumbnailStorageKey)
+    {
+        ThumbnailStorageKey = string.IsNullOrWhiteSpace(thumbnailStorageKey) ? null : thumbnailStorageKey.Trim();
+    }
+
+    public void SetSha256(string sha256)
+    {
+        if (string.IsNullOrWhiteSpace(sha256) || sha256.Trim().Length != 64 || !sha256.Trim().All(Uri.IsHexDigit))
+            throw new CommerceDomainException("MEDIA_HASH_INVALID", "A SHA-256 hash is required.");
+        Sha256 = sha256.Trim().ToLowerInvariant();
+    }
+
+    public bool TryClaimScan(DateTime now, TimeSpan leaseDuration)
+    {
+        if (ScanStatus != MediaScanStatus.Pending || now == default || leaseDuration <= TimeSpan.Zero ||
+            (NextScanAttemptAt is not null && NextScanAttemptAt > now) ||
+            (ScanLeaseExpiresAt is not null && ScanLeaseExpiresAt > now)) return false;
+        ScanLeaseExpiresAt = now.Add(leaseDuration);
+        return true;
+    }
+
+    public void ScheduleScanRetry(DateTime nextAttemptAt)
+    {
+        EnsurePendingScan();
+        EnsureOccurredAt(nextAttemptAt);
+        ScanAttemptCount++;
+        NextScanAttemptAt = nextAttemptAt;
+        ScanLeaseExpiresAt = null;
+    }
+
     public void Reject(string reason, DateTime scannedAt) => CompleteFailedScan(MediaScanStatus.Rejected, reason, scannedAt);
 
     public void MarkScanFailed(string reason, DateTime scannedAt) => CompleteFailedScan(MediaScanStatus.Failed, reason, scannedAt);
@@ -71,6 +112,8 @@ public class MediaAsset : BaseEntity
         ScanStatus = MediaScanStatus.Pending;
         ScannedAt = null;
         ScanFailureReason = null;
+        NextScanAttemptAt = null;
+        ScanLeaseExpiresAt = null;
     }
 
     public void ChangeVisibility(MediaVisibility visibility)
@@ -91,6 +134,7 @@ public class MediaAsset : BaseEntity
         ScanStatus = target;
         ScannedAt = scannedAt;
         ScanFailureReason = reason.Trim();
+        ScanLeaseExpiresAt = null;
         if (Visibility == MediaVisibility.Public)
             Visibility = MediaVisibility.Restricted;
     }

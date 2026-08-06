@@ -7,4 +7,11 @@ public class ProductVariantOptionValue : BaseEntity
     private ProductVariantOptionValue()
     {
     }
+
+    internal static ProductVariantOptionValue Create(Guid productVariantId, Guid productOptionValueId)
+    {
+        if (productVariantId == Guid.Empty || productOptionValueId == Guid.Empty)
+            throw new CommerceDomainException("VARIANT_OPTION_VALUE_INVALID", "Variant and option value are required.");
+        return new ProductVariantOptionValue { ProductVariantId = productVariantId, ProductOptionValueId = productOptionValueId };
+    }
 }

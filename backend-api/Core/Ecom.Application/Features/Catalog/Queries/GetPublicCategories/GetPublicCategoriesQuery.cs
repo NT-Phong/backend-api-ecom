@@ -8,14 +8,22 @@ public sealed record GetPublicCategoriesQuery : IRequest<TResult<IReadOnlyList<P
 public sealed class GetPublicCategoriesQueryHandler(IUnitOfWork unitOfWork)
     : IRequestHandler<GetPublicCategoriesQuery, TResult<IReadOnlyList<PublicCategoryDto>>>
 {
-    public async Task<TResult<IReadOnlyList<PublicCategoryDto>>> Handle(GetPublicCategoriesQuery request,
+    public async Task<TResult<IReadOnlyList<PublicCategoryDto>>> Handle(
+        GetPublicCategoriesQuery request,
         CancellationToken cancellationToken)
     {
-        var categories = await unitOfWork.Repository<Category>().QueryNoTracking()
-            .Where(x => x.Status == CatalogStatus.Published)
-            .OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
-            .Select(x => new PublicCategoryDto(x.Id, x.ParentId, x.Name, x.Slug, x.Description, x.DisplayOrder))
-            .ToListAsync(cancellationToken);
-        return TResult<IReadOnlyList<PublicCategoryDto>>.Success(categories);
+        var categories = await PublicCategoryVisibility.LoadAsync(unitOfWork, cancellationToken);
+        var byId = categories.ToDictionary(category => category.Id);
+        IReadOnlyList<PublicCategoryDto> result = categories
+            .Where(category => category.Status == CatalogStatus.Published && PublicCategoryVisibility.HasPublishedAncestors(category, byId))
+            .Select(category => new PublicCategoryDto(
+                category.Id,
+                category.ParentId,
+                category.Name,
+                category.Slug,
+                category.Description,
+                category.DisplayOrder))
+            .ToList();
+        return TResult<IReadOnlyList<PublicCategoryDto>>.Success(result);
     }
 }
