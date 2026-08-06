@@ -96,6 +96,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ICartPrincipalResolver, CartPrincipalResolver>();
         services.AddScoped<IInventoryReservationStore, InventoryReservationStore>();
+        services.AddScoped<IOrderLifecycleStore, OrderLifecycleStore>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<IPublicCatalogReadStore, PublicCatalogReadStore>();
         services.AddSingleton<IOrderNumberGenerator, OrderNumberGenerator>();

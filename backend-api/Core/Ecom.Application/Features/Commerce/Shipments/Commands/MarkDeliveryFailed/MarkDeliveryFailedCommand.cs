@@ -13,14 +13,14 @@ public sealed class MarkDeliveryFailedCommandValidator : AbstractValidator<MarkD
     }
 }
 
-public sealed class MarkDeliveryFailedCommandHandler(IUnitOfWork uow, ICurrentUser current)
+public sealed class MarkDeliveryFailedCommandHandler(IUnitOfWork uow, ICurrentUser current, IOrderLifecycleStore orderLifecycleStore)
     : IRequestHandler<MarkDeliveryFailedCommand, TResult>
 {
     public async Task<TResult> Handle(MarkDeliveryFailedCommand request, CancellationToken cancellationToken)
     {
         if (!current.HasPolicy(Permissions.Shipments.Manage)) return TResult.Failure(MessageKey.Forbidden, ErrorCodes.FORBIDDEN);
-        var order = await uow.Repository<Order>().FindByIdAsync(request.OrderId);
-        var shipment = await uow.Repository<Shipment>().Query().FirstOrDefaultAsync(x => x.OrderId == request.OrderId, cancellationToken);
+        var order = await orderLifecycleStore.LockOrderAsync(request.OrderId, cancellationToken);
+        var shipment = await orderLifecycleStore.LockShipmentAsync(request.OrderId, cancellationToken);
         if (order is null || shipment is null) return TResult.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
 
         var orderHistory = await uow.Repository<OrderStatusHistory>().Query().Where(x => x.OrderId == order.Id).ToListAsync(cancellationToken);

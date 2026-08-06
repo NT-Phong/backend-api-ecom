@@ -8,6 +8,7 @@ using Ecom.Application.Features.Commerce.Shipments.Commands.CompleteShipment;
 using Ecom.Application.Features.Commerce.Shipments.Commands.MarkDeliveryFailed;
 using Ecom.Application.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Ecom.API.Controllers.V1;
@@ -15,6 +16,7 @@ namespace Ecom.API.Controllers.V1;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/management/orders")]
 [Authorize]
+[ValidateAntiForgeryToken]
 [EnableRateLimiting(CommerceRateLimitPolicyNames.ManagementMutation)]
 public sealed class ManagementOrdersController : BaseController
 {

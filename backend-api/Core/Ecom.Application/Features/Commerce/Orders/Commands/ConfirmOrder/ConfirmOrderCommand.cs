@@ -8,13 +8,13 @@ public sealed class ConfirmOrderCommandValidator : AbstractValidator<ConfirmOrde
     public ConfirmOrderCommandValidator() => RuleFor(x => x.OrderId).NotEmpty();
 }
 
-public sealed class ConfirmOrderCommandHandler(IUnitOfWork uow, ICurrentUser current) : IRequestHandler<ConfirmOrderCommand, TResult>
+public sealed class ConfirmOrderCommandHandler(IUnitOfWork uow, ICurrentUser current, IOrderLifecycleStore orderLifecycleStore) : IRequestHandler<ConfirmOrderCommand, TResult>
 {
     public async Task<TResult> Handle(ConfirmOrderCommand r, CancellationToken ct)
     {
         if (!current.HasPolicy(Permissions.Orders.Manage)) return TResult.Failure(MessageKey.Forbidden, ErrorCodes.FORBIDDEN);
-        var order = await uow.Repository<Order>().FindByIdAsync(r.OrderId); if (order is null) return TResult.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
-        var payment = await uow.Repository<Payment>().FindOneAsync([x => x.OrderId == order.Id]);
+        var order = await orderLifecycleStore.LockOrderAsync(r.OrderId, ct); if (order is null) return TResult.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
+        var payment = await orderLifecycleStore.LockPaymentAsync(order.Id, ct);
         if (payment is null || (payment.Method == PaymentMethod.BankTransfer && payment.Status != PaymentStatus.Paid)) return TResult.Failure("Payment must be verified before confirmation.", ErrorCodes.UNPROCESSABLE_ENTITY);
         var history = await uow.Repository<OrderStatusHistory>().Query().Where(x => x.OrderId == order.Id).ToListAsync(ct);
         order.Confirm(current.UserId, DateTime.UtcNow, history);

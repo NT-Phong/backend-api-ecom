@@ -27,6 +27,13 @@ public interface IInventoryReservationStore
         IReadOnlyCollection<InventoryLevelLockRequest> requests, CancellationToken cancellationToken);
 }
 
+public interface IOrderLifecycleStore
+{
+    Task<Order?> LockOrderAsync(Guid orderId, CancellationToken cancellationToken);
+    Task<Payment?> LockPaymentAsync(Guid orderId, CancellationToken cancellationToken);
+    Task<Shipment?> LockShipmentAsync(Guid orderId, CancellationToken cancellationToken);
+}
+
 public interface IIdempotencyStore
 {
     Task<IdempotencyBeginResult> BeginAsync(string operation, string ownerScope, string key, string fingerprint,

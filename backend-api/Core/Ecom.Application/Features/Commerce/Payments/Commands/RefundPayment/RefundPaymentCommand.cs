@@ -17,16 +17,15 @@ public sealed class RefundPaymentCommandValidator : AbstractValidator<RefundPaym
 }
 
 public sealed class RefundPaymentCommandHandler(IUnitOfWork unitOfWork, ICurrentUser current,
-    IInventoryReservationStore inventoryStore) : IRequestHandler<RefundPaymentCommand, TResult>
+    IInventoryReservationStore inventoryStore, IOrderLifecycleStore orderLifecycleStore) : IRequestHandler<RefundPaymentCommand, TResult>
 {
     public async Task<TResult> Handle(RefundPaymentCommand request, CancellationToken cancellationToken)
     {
         if (!current.HasPolicy(Permissions.Payments.Refund))
             return TResult.Failure(MessageKey.Forbidden, ErrorCodes.FORBIDDEN);
 
-        var order = await unitOfWork.Repository<Order>().FindByIdAsync(request.OrderId);
-        var payment = await unitOfWork.Repository<Payment>().Query()
-            .FirstOrDefaultAsync(x => x.OrderId == request.OrderId, cancellationToken);
+        var order = await orderLifecycleStore.LockOrderAsync(request.OrderId, cancellationToken);
+        var payment = await orderLifecycleStore.LockPaymentAsync(request.OrderId, cancellationToken);
         if (order is null || payment is null)
             return TResult.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
         if (payment.Status != PaymentStatus.Paid)
