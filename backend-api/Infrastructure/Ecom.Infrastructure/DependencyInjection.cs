@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.Configure<AuthRateLimitOptions>(configuration.GetSection(AuthRateLimitOptions.SectionName));
         services.Configure<MediaStorageOptions>(configuration.GetSection(MediaStorageOptions.SectionName));
         services.Configure<MediaProcessingOptions>(configuration.GetSection(MediaProcessingOptions.SectionName));
+        services.Configure<OutboxProcessorOptions>(configuration.GetSection(OutboxProcessorOptions.SectionName));
         services.AddSingleton<IValidateOptions<DemoQrLoginOptions>, DemoQrLoginOptionsValidator>();
         services.AddOptions<DemoQrLoginOptions>()
             .Bind(configuration.GetSection(DemoQrLoginOptions.SectionName))
@@ -97,6 +98,8 @@ public static class DependencyInjection
         services.AddScoped<IInventoryReservationStore, InventoryReservationStore>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddSingleton<IOrderNumberGenerator, OrderNumberGenerator>();
+        services.AddScoped<OutboxMessageDispatcher>();
+        services.AddScoped<OutboxProcessor>();
 
         // Auto-register repository implementations
         services.RegisAllService(new[] { "Ecom.Infrastructure", "Ecom.Application" });
@@ -116,6 +119,8 @@ public static class DependencyInjection
         services.AddHostedService<MediaStorageStartupValidator>();
         services.AddHostedService<MediaProcessingWorker>();
         services.AddHostedService<ReservationExpiryWorker>();
+        if (configuration.GetValue<bool>("Outbox:Enabled"))
+            services.AddHostedService<OutboxProcessorWorker>();
 
         // Authentication & Security Services
         services.AddScoped<IJwtTokenService, JwtTokenService>();

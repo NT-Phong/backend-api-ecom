@@ -10,7 +10,8 @@ namespace Ecom.API.Extensions;
 
 public static class ServiceExtensions
 {
-    public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.AddControllers(options =>
         {
@@ -46,11 +47,18 @@ public static class ServiceExtensions
         services.AddSwaggerGen();
         services.ConfigureOptions<ConfigureSwaggerOptions>();
 
+        var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?.Where(origin => Uri.TryCreate(origin, UriKind.Absolute, out _))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+        if (allowedOrigins.Length == 0 && !environment.IsDevelopment())
+            throw new InvalidOperationException("Cors:AllowedOrigins must contain at least one absolute origin outside Development.");
+
         services.AddCors(options =>
         {
             options.AddPolicy("DefaultPolicy", builder =>
             {
-                builder.WithOrigins("http://localhost:3000", "https://localhost:3000", "http://localhost:5173", "https://test-portal.Ecom.vn", "https://mebi-mebione-d-portal-as-1.azurewebsites.net", "https://Ecom-log-viewer.vercel.app")
+                builder.WithOrigins(allowedOrigins)
                        .AllowAnyMethod()
                        .AllowAnyHeader()
                        .AllowCredentials();
@@ -89,6 +97,8 @@ public static class ServiceExtensions
     {
         var settings = configuration.GetSection(AuthRateLimitOptions.SectionName)
             .Get<AuthRateLimitOptions>() ?? new AuthRateLimitOptions();
+        var commerceSettings = configuration.GetSection(CommerceRateLimitOptions.SectionName)
+            .Get<CommerceRateLimitOptions>() ?? new CommerceRateLimitOptions();
 
         services.AddRateLimiter(options =>
         {
@@ -112,6 +122,10 @@ public static class ServiceExtensions
             AddIpPolicy(options, AuthRateLimitPolicyNames.DemoQrStartIp, settings.DemoQrStartIp);
             AddIpPolicy(options, AuthRateLimitPolicyNames.DemoQrStatusIp, settings.DemoQrStatusIp);
             AddIpPolicy(options, AuthRateLimitPolicyNames.DemoQrApproveIp, settings.DemoQrApproveIp);
+            AddIpPolicy(options, CommerceRateLimitPolicyNames.CartMutation, commerceSettings.CartMutation);
+            AddIpPolicy(options, CommerceRateLimitPolicyNames.CheckoutPreview, commerceSettings.CheckoutPreview);
+            AddIpPolicy(options, CommerceRateLimitPolicyNames.OrderCreate, commerceSettings.OrderCreate);
+            AddIpPolicy(options, CommerceRateLimitPolicyNames.ManagementMutation, commerceSettings.ManagementMutation);
         });
     }
 

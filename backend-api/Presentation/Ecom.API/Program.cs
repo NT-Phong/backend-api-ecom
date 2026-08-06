@@ -27,7 +27,7 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 
 // Add API specific services
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddApiServices(builder.Configuration);
+builder.Services.AddApiServices(builder.Configuration, builder.Environment);
 
 var timeout = 10;
 var value = builder.Configuration.GetSection("ApplicationTimeout").Value;
@@ -130,7 +130,8 @@ if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger
     });
 }
 
-// app.UseHttpsRedirection(); // Disabled for HTTP-only deployment
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 // Expose only promoted public media. Quarantine and private files remain outside this file provider.
 var webRoot = string.IsNullOrWhiteSpace(app.Environment.WebRootPath)

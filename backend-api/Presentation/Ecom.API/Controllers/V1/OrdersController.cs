@@ -2,7 +2,10 @@ using Ecom.Application.Features.Commerce.Orders.Commands.CreateOrder;
 using Ecom.Application.Features.Commerce.Orders.Commands.CancelOrder;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetOrder;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetOrders;
+using Ecom.Application.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Ecom.API.Controllers.V1;
 
@@ -19,6 +22,8 @@ public sealed class OrdersController : BaseController
         HandleResult(await Mediator.Send(new GetOrderQuery(orderId), cancellationToken));
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(CommerceRateLimitPolicyNames.OrderCreate)]
     public async Task<IActionResult> Create(CreateOrderCommand command, [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
@@ -28,6 +33,8 @@ public sealed class OrdersController : BaseController
     }
 
     [HttpPost("{orderId:guid}/cancel")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(CommerceRateLimitPolicyNames.CartMutation)]
     public async Task<IActionResult> Cancel(Guid orderId, CancelOrderCommand command, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(command with { OrderId = orderId }, cancellationToken));
 }

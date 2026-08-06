@@ -70,6 +70,7 @@ public static class Permissions
     public static class Payments
     {
         public const string Verify = "payments.verify";
+        public const string Refund = "payments.refund";
     }
 
     public static class Shipments
@@ -145,6 +146,7 @@ public static class Permissions
             ,new(Orders.Read, "Xem và tra cứu đơn hàng", "Orders")
             ,new(Orders.Manage, "Quản lý trạng thái đơn hàng", "Orders")
             ,new(Payments.Verify, "Xác minh thanh toán", "Payments")
+            ,new(Payments.Refund, "Hoàn tiền thanh toán", "Payments")
             ,new(Shipments.Manage, "Quản lý giao hàng", "Shipments")
             ,new(CatalogCategories.Read, "Xem quản trị danh mục", "CatalogCategories")
             ,new(CatalogCategories.Create, "Tạo danh mục", "CatalogCategories")
