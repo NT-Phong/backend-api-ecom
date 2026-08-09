@@ -2,6 +2,7 @@ using Ecom.Application.Features.Commerce.Orders.Commands.CreateOrder;
 using Ecom.Application.Features.Commerce.Orders.Commands.CancelOrder;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetOrder;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetOrders;
+using Ecom.Application.Features.Commerce.Payments.Commands.CreateSePayCheckout;
 using Ecom.Application.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,6 +32,12 @@ public sealed class OrdersController : BaseController
             return BadRequest(ApiResponse<object>.Fail("Idempotency-Key header is required.", ErrorCodes.BAD_REQUEST));
         return HandleResult(await Mediator.Send(command with { IdempotencyKey = idempotencyKey }, cancellationToken));
     }
+
+    [HttpPost("{orderId:guid}/payments/sepay/checkout")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(CommerceRateLimitPolicyNames.PaymentCheckout)]
+    public async Task<IActionResult> CreateSePayCheckout(Guid orderId, CancellationToken cancellationToken) =>
+        HandleResult(await Mediator.Send(new CreateSePayCheckoutCommand(orderId), cancellationToken));
 
     [HttpPost("{orderId:guid}/cancel")]
     [ValidateAntiForgeryToken]

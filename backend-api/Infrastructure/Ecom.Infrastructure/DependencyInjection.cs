@@ -46,6 +46,10 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.Configure<PasswordSettings>(configuration.GetSection(PasswordSettings.SectionName));
         services.Configure<EmailVerificationOptions>(configuration.GetSection(EmailVerificationOptions.SectionName));
+        services.AddSingleton<IValidateOptions<SePayOptions>, SePayOptionsValidator>();
+        services.AddOptions<SePayOptions>()
+            .Bind(configuration.GetSection(SePayOptions.SectionName))
+            .ValidateOnStart();
         services.AddSingleton<IValidateOptions<PasswordAuthenticationV2Options>, PasswordAuthenticationV2OptionsValidator>();
         services.AddOptions<PasswordAuthenticationV2Options>()
             .Bind(configuration.GetSection(PasswordAuthenticationV2Options.SectionName))
@@ -110,6 +114,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IDateTimeService, DateTimeService>();
         services.AddScoped<IHelperService, HelperService>();
+        services.AddSingleton<ISePayCheckoutService, SePayCheckoutService>();
         if (string.Equals(configuration[$"{MediaStorageOptions.SectionName}:Provider"], "Azure", StringComparison.OrdinalIgnoreCase))
             services.AddScoped<IStorageService, AzureBlobStorageService>();
         else

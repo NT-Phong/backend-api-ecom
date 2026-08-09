@@ -15,6 +15,41 @@ public class PaymentShipmentTradeInquiryTests
     }
 
     [Fact]
+    public void Sepay_payment_starts_pending_and_gateway_attempt_tracks_the_confirmed_transaction()
+    {
+        var payment = Payment.Create(Guid.NewGuid(), PaymentMethod.SePay, 150m, DateTime.UtcNow.AddMinutes(30));
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.True(payment.RequiresPrepayment());
+
+        var attempt = PaymentGatewayAttempt.Create(payment.Id, "sepay", "SP-ORD-001", payment.Amount, "VND",
+            DateTime.UtcNow.AddMinutes(30));
+        attempt.MarkCheckoutIssued(DateTime.UtcNow);
+        attempt.MarkPaid("provider-order", "provider-transaction", "provider-reference", "CAPTURED", "APPROVED",
+            DateTime.UtcNow, DateTime.UtcNow);
+
+        Assert.Equal(PaymentGatewayAttemptStatus.Paid, attempt.Status);
+        Assert.Equal("provider-transaction", attempt.ExternalTransactionId);
+    }
+
+    [Fact]
+    public void Sepay_void_is_recorded_for_reconciliation_without_mutating_the_payment()
+    {
+        var payment = Payment.Create(Guid.NewGuid(), PaymentMethod.SePay, 150m, DateTime.UtcNow.AddMinutes(30));
+        var attempt = PaymentGatewayAttempt.Create(payment.Id, "sepay", "SP-ORD-VOID", payment.Amount, "VND",
+            DateTime.UtcNow.AddMinutes(30));
+
+        attempt.MarkNeedsReconciliation(DateTime.UtcNow);
+        var notification = PaymentGatewayNotification.Create(attempt.Id, "sepay", "TRANSACTION_VOID",
+            PaymentGatewayNotificationDisposition.NeedsReconciliation, "SP-ORD-VOID", 150m, 150m, "VND",
+            "provider-order", "provider-transaction", null, "VOIDED", "VOIDED", "TRANSACTION_VOID",
+            DateTime.UtcNow, DateTime.UtcNow);
+
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(PaymentGatewayAttemptStatus.NeedsReconciliation, attempt.Status);
+        Assert.Equal(PaymentGatewayNotificationDisposition.NeedsReconciliation, notification.Disposition);
+    }
+
+    [Fact]
     public void Shipment_records_delivery_flow_and_rejects_invalid_transition()
     {
         var history = new List<ShipmentHistory>();

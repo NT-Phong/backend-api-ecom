@@ -125,6 +125,8 @@ public static class ServiceExtensions
             AddIpPolicy(options, CommerceRateLimitPolicyNames.CartMutation, commerceSettings.CartMutation);
             AddIpPolicy(options, CommerceRateLimitPolicyNames.CheckoutPreview, commerceSettings.CheckoutPreview);
             AddIpPolicy(options, CommerceRateLimitPolicyNames.OrderCreate, commerceSettings.OrderCreate);
+            AddIpPolicy(options, CommerceRateLimitPolicyNames.PaymentCheckout, commerceSettings.PaymentCheckout);
+            AddIpPolicy(options, CommerceRateLimitPolicyNames.PaymentIpn, commerceSettings.PaymentIpn);
             AddIpPolicy(options, CommerceRateLimitPolicyNames.ManagementMutation, commerceSettings.ManagementMutation);
         });
     }

@@ -30,4 +30,12 @@ SELECT * FROM ""Tbl_Shipment""
 WHERE ""OrderId"" = {orderId} AND ""IsDeleted"" = false
 FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
+
+    public Task<PaymentGatewayAttempt?> LockPaymentGatewayAttemptAsync(string provider, string invoiceNumber,
+        CancellationToken cancellationToken) =>
+        db.PaymentGatewayAttempts.FromSqlInterpolated($@"
+SELECT * FROM ""Tbl_PaymentGatewayAttempt""
+WHERE ""Provider"" = {provider} AND ""InvoiceNumber"" = {invoiceNumber} AND ""IsDeleted"" = false
+FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
 }

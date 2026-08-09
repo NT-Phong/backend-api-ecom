@@ -32,6 +32,8 @@ public interface IOrderLifecycleStore
     Task<Order?> LockOrderAsync(Guid orderId, CancellationToken cancellationToken);
     Task<Payment?> LockPaymentAsync(Guid orderId, CancellationToken cancellationToken);
     Task<Shipment?> LockShipmentAsync(Guid orderId, CancellationToken cancellationToken);
+    Task<PaymentGatewayAttempt?> LockPaymentGatewayAttemptAsync(string provider, string invoiceNumber,
+        CancellationToken cancellationToken);
 }
 
 public interface IIdempotencyStore
@@ -43,4 +45,15 @@ public interface IIdempotencyStore
 public interface IOrderNumberGenerator
 {
     string Create(DateTime nowUtc);
+}
+
+public sealed record SePayCheckoutRequest(Guid OrderId, string InvoiceNumber, decimal Amount, string OrderNumber, Guid? CustomerId);
+public sealed record SePayCheckoutField(string Name, string Value);
+public sealed record SePayCheckoutForm(string ActionUrl, string Method, IReadOnlyList<SePayCheckoutField> Fields);
+
+public interface ISePayCheckoutService
+{
+    bool IsEnabled { get; }
+    SePayCheckoutForm CreateCheckoutForm(SePayCheckoutRequest request);
+    bool IsValidIpnSecret(string? suppliedSecret);
 }

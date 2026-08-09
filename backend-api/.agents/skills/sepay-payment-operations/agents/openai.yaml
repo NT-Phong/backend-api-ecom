@@ -1,0 +1,4 @@
+interface:
+  display_name: "SePay Payment Operations"
+  short_description: "Safely evolve SePay checkout and IPN flows"
+  default_prompt: "Use $sepay-payment-operations to analyze or implement this Thanh Hoa Commerce SePay payment task."

@@ -15,7 +15,7 @@ public sealed class ConfirmOrderCommandHandler(IUnitOfWork uow, ICurrentUser cur
         if (!current.HasPolicy(Permissions.Orders.Manage)) return TResult.Failure(MessageKey.Forbidden, ErrorCodes.FORBIDDEN);
         var order = await orderLifecycleStore.LockOrderAsync(r.OrderId, ct); if (order is null) return TResult.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
         var payment = await orderLifecycleStore.LockPaymentAsync(order.Id, ct);
-        if (payment is null || (payment.Method == PaymentMethod.BankTransfer && payment.Status != PaymentStatus.Paid)) return TResult.Failure("Payment must be verified before confirmation.", ErrorCodes.UNPROCESSABLE_ENTITY);
+        if (payment is null || (payment.RequiresPrepayment() && payment.Status != PaymentStatus.Paid)) return TResult.Failure("Payment must be verified before confirmation.", ErrorCodes.UNPROCESSABLE_ENTITY);
         var history = await uow.Repository<OrderStatusHistory>().Query().Where(x => x.OrderId == order.Id).ToListAsync(ct);
         order.Confirm(current.UserId, DateTime.UtcNow, history);
         var items = await uow.Repository<OrderItem>().Query().Where(x => x.OrderId == order.Id).ToListAsync(ct);

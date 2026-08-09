@@ -22,9 +22,11 @@ public enum InventoryMovementType { Receive, Allocate, Release, Adjust, Ship, Re
 public enum CartStatus { Active, Converted, Expired }
 public enum OrderStatus { Pending, Confirmed, Preparing, Shipping, Completed, Cancelled, DeliveryFailed }
 public enum OrderNoteType { Internal, Customer, System }
-public enum PaymentMethod { COD, BankTransfer, Gateway }
+public enum PaymentMethod { COD, BankTransfer, Gateway, SePay }
 public enum PaymentStatus { Pending, AwaitingConfirmation, Paid, Failed, Refunded, Cancelled }
 public enum PaymentTransactionType { Initiate, Capture, Verify, Refund }
+public enum PaymentGatewayAttemptStatus { Created, CheckoutIssued, Paid, NeedsReconciliation }
+public enum PaymentGatewayNotificationDisposition { Accepted, Duplicate, NeedsReconciliation }
 public enum ShipmentStatus { Pending, Ready, Shipping, Delivered, DeliveryFailed, Cancelled }
 public enum CertificationVerificationStatus { Pending, Verified, Rejected, Expired }
 public enum CertificationEvidenceType { Certificate, SupportingDocument, Other }

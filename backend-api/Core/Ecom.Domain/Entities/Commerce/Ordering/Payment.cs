@@ -27,6 +27,8 @@ public class Payment : BaseEntity, IAggregateRoot
         };
     }
 
+    public bool RequiresPrepayment() => Method is PaymentMethod.BankTransfer or PaymentMethod.SePay;
+
     public PaymentTransaction MarkAwaitingConfirmation(string provider, DateTime occurredAt)
     {
         if (Status != PaymentStatus.Pending)
