@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Ecom.API.Serialization;
 using Microsoft.OpenApi.Models;
 using Ecom.Application.Common.Configuration;
+using Ecom.Infrastructure.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 
@@ -89,6 +90,8 @@ public static class ServiceExtensions
             throw new InvalidOperationException(
                 "Missing connection string 'DefaultConnection'. Please configure it in appsettings.json or via environment variable 'ConnectionStrings__DefaultConnection'.");
         }
+
+        healthChecksBuilder.AddCheck<MediaProcessingHealthCheck>("media-processing", tags: new[] { "ready" });
 
         return services;
     }

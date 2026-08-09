@@ -17,8 +17,11 @@ public sealed class GetCatalogCategoryTreeQueryHandler(IUnitOfWork unitOfWork, I
             return TResult<IReadOnlyList<CatalogCategoryTreeItemDto>>.Failure(authorization.Error!, authorization.ErrorCode);
 
         var categories = await unitOfWork.Repository<Category>().QueryNoTracking()
+            .OrderBy(x => x.DisplayOrder)
+            .ThenBy(x => x.Name)
+            .ThenBy(x => x.Id)
             .Select(x => new CategoryNode(x.Id, x.ParentId, x.Name, x.Slug, x.Status, x.DisplayOrder))
-            .OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name).ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
         var childrenByParent = categories.Where(x => x.ParentId.HasValue).GroupBy(x => x.ParentId!.Value)
             .ToDictionary(x => x.Key, x => x.ToList());
         var roots = categories.Where(x => !x.ParentId.HasValue || !categories.Any(parent => parent.Id == x.ParentId.Value));

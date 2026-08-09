@@ -31,6 +31,7 @@ public sealed class MigrationPostgreSqlTests(PostgreSqlFixture fixture)
             "NextScanAttemptAt",
             "ScanAttemptCount",
             "ScanLeaseExpiresAt",
+            "ScanFailureCode",
             "Sha256",
             "ThumbnailStorageKey"
         });
@@ -39,7 +40,7 @@ public sealed class MigrationPostgreSqlTests(PostgreSqlFixture fixture)
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync()) columns.Add(reader.GetString(0));
 
-        Assert.Equal(5, columns.Count);
+        Assert.Equal(6, columns.Count);
     }
 
     [PostgreSqlFact]

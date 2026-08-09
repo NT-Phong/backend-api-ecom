@@ -42,11 +42,11 @@ public sealed class AttachProductMediaCommandHandler(
         var asset = await unitOfWork.Repository<MediaAsset>().FindByIdAsync(request.MediaAssetId);
         if (asset is null)
             return TResult<ProductManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
-        if (!asset.IsPubliclyUsable)
-            return TResult<ProductManagementResult>.Failure("MEDIA_NOT_READY", ErrorCodes.BAD_REQUEST);
         var mediaAuthorization = mediaAccess.EnsureOwnerOrManager(asset);
         if (!mediaAuthorization.IsSuccess)
             return TResult<ProductManagementResult>.Failure(mediaAuthorization.Error!, mediaAuthorization.ErrorCode);
+        if (!asset.IsPubliclyUsable)
+            return TResult<ProductManagementResult>.Failure("MEDIA_NOT_READY", ErrorCodes.BAD_REQUEST);
 
         product.ReturnToReviewIfPublished(DateTime.UtcNow);
         var links = await unitOfWork.Repository<ProductMedia>().FindAsync([x => x.ProductId == product.Id]);

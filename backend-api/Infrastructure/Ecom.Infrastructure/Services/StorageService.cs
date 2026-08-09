@@ -37,12 +37,24 @@ public sealed class LocalStorageService(IWebHostEnvironment environment) : IStor
     public async Task<string> UploadToQuarantineAsync(Stream fileStream, string safeExtension, string contentType,
         CancellationToken cancellationToken = default)
     {
+        return await UploadAsync(fileStream, safeExtension, QuarantineArea, cancellationToken);
+    }
+
+    public async Task<string> UploadToPublicAsync(Stream fileStream, string safeExtension, string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        return await UploadAsync(fileStream, safeExtension, PublicArea, cancellationToken);
+    }
+
+    private async Task<string> UploadAsync(Stream fileStream, string safeExtension, string area,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(fileStream);
         if (string.IsNullOrWhiteSpace(safeExtension) || !safeExtension.StartsWith('.') ||
             safeExtension.Length < 2 || safeExtension[1..].Any(c => !char.IsLetterOrDigit(c)))
             throw new ArgumentException("A safe file extension is required.", nameof(safeExtension));
 
-        var key = Path.Combine(UploadRoot, QuarantineArea, DateTime.UtcNow.ToString("yyyy/MM/dd"),
+        var key = Path.Combine(UploadRoot, area, DateTime.UtcNow.ToString("yyyy/MM/dd"),
             $"{Guid.NewGuid():N}{safeExtension.ToLowerInvariant()}");
         var path = GetPhysicalPath(key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);

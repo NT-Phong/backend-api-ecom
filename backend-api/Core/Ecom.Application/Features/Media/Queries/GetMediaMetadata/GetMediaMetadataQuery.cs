@@ -13,8 +13,6 @@ public sealed class GetMediaMetadataQueryHandler(IUnitOfWork unitOfWork, IMediaA
         if (media is null) return TResult<MediaMetadataResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
         var authorization = access.EnsureOwnerOrManager(media);
         if (!authorization.IsSuccess) return TResult<MediaMetadataResult>.Failure(authorization.Error!, authorization.ErrorCode);
-        return TResult<MediaMetadataResult>.Success(new MediaMetadataResult(media.Id, media.OriginalFileName,
-            media.ContentType, media.SizeBytes, media.MediaType, media.UploadIntent, media.Visibility,
-            media.TargetVisibility, media.ScanStatus, media.AltText, media.ScanFailureReason, media.CreatedAt));
+        return TResult<MediaMetadataResult>.Success(MediaMetadataResults.From(media));
     }
 }

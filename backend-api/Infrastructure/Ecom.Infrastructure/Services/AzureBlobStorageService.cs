@@ -52,16 +52,31 @@ public sealed class AzureBlobStorageService : IStorageService
 
     public async Task<string> UploadToQuarantineAsync(Stream fileStream, string safeExtension, string contentType, CancellationToken cancellationToken = default)
     {
+        return await UploadAsync(fileStream, safeExtension, contentType, _options.QuarantineContainer,
+            PublicAccessType.None, "quarantine", cancellationToken);
+    }
+
+    public async Task<string> UploadToPublicAsync(Stream fileStream, string safeExtension, string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        return await UploadAsync(fileStream, safeExtension, contentType, _options.PublicContainer,
+            PublicAccessType.Blob, "public", cancellationToken);
+    }
+
+    private async Task<string> UploadAsync(Stream fileStream, string safeExtension, string contentType,
+        string containerName, PublicAccessType publicAccessType, string storageArea, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fileStream);
         if (string.IsNullOrWhiteSpace(safeExtension) || !safeExtension.StartsWith('.') || safeExtension[1..].Any(c => !char.IsLetterOrDigit(c)))
             throw new ArgumentException("A safe file extension is required.", nameof(safeExtension));
         var blobName = $"{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}{safeExtension.ToLowerInvariant()}";
-        var container = _client.GetBlobContainerClient(_options.QuarantineContainer);
-        await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+        var container = _client.GetBlobContainerClient(containerName);
+        await container.CreateIfNotExistsAsync(publicAccessType, cancellationToken: cancellationToken);
         await container.GetBlobClient(blobName).UploadAsync(fileStream, new BlobUploadOptions
         {
             HttpHeaders = new BlobHttpHeaders { ContentType = contentType }
         }, cancellationToken);
-        return $"quarantine/{blobName}";
+        return $"{storageArea}/{blobName}";
     }
 
     public async Task<string> PromoteAsync(string quarantineKey, MediaVisibility targetVisibility, CancellationToken cancellationToken = default)

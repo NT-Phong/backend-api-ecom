@@ -1,8 +1,11 @@
 using Ecom.Application.Common.Services;
+using Ecom.Application.Common.Configuration;
 using Ecom.Application.Features.Media.Commands.DeleteMedia;
+using Ecom.Application.Features.Media.Commands.RetryMediaScan;
 using Ecom.Application.Features.Media.Queries.GetMediaMetadata;
 using Ecom.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Ecom.API.Controllers.V1;
 
@@ -34,6 +37,13 @@ public sealed class MediaController(MediaUploadOrchestrator uploads) : BaseContr
     [Authorize(Policy = Permissions.Media.Read)]
     public async Task<IActionResult> Get(Guid mediaAssetId, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(new GetMediaMetadataQuery(mediaAssetId), cancellationToken));
+
+    [HttpPost("{mediaAssetId:guid}/retry-scan")]
+    [Authorize(Policy = Permissions.Media.Read)]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(CommerceRateLimitPolicyNames.ManagementMutation)]
+    public async Task<IActionResult> RetryScan(Guid mediaAssetId, CancellationToken cancellationToken) =>
+        HandleResult(await Mediator.Send(new RetryMediaScanCommand(mediaAssetId), cancellationToken));
 
     [HttpDelete("{mediaAssetId:guid}")]
     [Authorize(Policy = Permissions.Media.Delete)]

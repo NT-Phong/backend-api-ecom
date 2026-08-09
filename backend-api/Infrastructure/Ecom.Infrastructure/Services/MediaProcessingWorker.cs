@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Net.Sockets;
 using Ecom.Application.Common.Configuration;
 using Ecom.Domain.Entities;
 using Ecom.Domain.Enums;
@@ -17,9 +18,10 @@ public sealed class MediaProcessingWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!options.Value.Enabled)
+        if (!options.Value.Enabled || options.Value.DirectPublicUploadEnabled)
         {
-            logger.LogInformation("Media processing worker is disabled.");
+            logger.LogInformation("Media processing worker is disabled. Enabled: {Enabled}; DirectPublicUpload: {DirectPublicUpload}",
+                options.Value.Enabled, options.Value.DirectPublicUploadEnabled);
             return;
         }
 
@@ -122,7 +124,10 @@ public sealed class MediaProcessingWorker(
             if (promotedOriginal is not null) await storage.DeleteIfExistsAsync(promotedOriginal, cancellationToken);
             if (promotedThumbnail is not null) await storage.DeleteIfExistsAsync(promotedThumbnail, cancellationToken);
             if (media.ScanAttemptCount >= RetryDelays.Length - 1)
-                media.MarkScanFailed("Media processing failed.", DateTime.UtcNow);
+            {
+                var failure = ClassifyFailure(ex);
+                media.MarkScanFailed(failure.Code, failure.SafeReason, DateTime.UtcNow);
+            }
             else
                 media.ScheduleScanRetry(DateTime.UtcNow.Add(RetryDelays[media.ScanAttemptCount]));
             await unitOfWork.Repository<MediaAsset>().UpdateAsync(media, cancellationToken);
@@ -130,6 +135,20 @@ public sealed class MediaProcessingWorker(
             logger.LogWarning(ex, "Media processing failed for {MediaAssetId}.", mediaId);
         }
     }
+
+    private static MediaProcessingFailure ClassifyFailure(Exception exception) => exception switch
+    {
+        SocketException or TimeoutException => new(MediaScanFailureCodes.ScannerUnavailable,
+            "The malware scanner is temporarily unavailable. Please try again later."),
+        InvalidDataException => new(MediaScanFailureCodes.ThumbnailGenerationFailed,
+            "The image could not be processed into a thumbnail."),
+        IOException => new(MediaScanFailureCodes.StorageProcessingFailed,
+            "The media storage service is temporarily unavailable. Please try again later."),
+        _ => new(MediaScanFailureCodes.ProcessingFailed,
+            "Media processing failed. Please try again later.")
+    };
+
+    private sealed record MediaProcessingFailure(string Code, string SafeReason);
 
     private async Task CleanupExpiredAsync(CancellationToken cancellationToken)
     {

@@ -14,7 +14,8 @@ public sealed class MediaStorageStartupValidator(IHostEnvironment environment,
         if (!string.Equals(storage.Value.Provider, "Azure", StringComparison.OrdinalIgnoreCase) ||
             string.IsNullOrWhiteSpace(storage.Value.AccountUrl))
             throw new InvalidOperationException("Production media storage requires Azure with Managed Identity AccountUrl.");
-        if (!processing.Value.Enabled || string.IsNullOrWhiteSpace(processing.Value.ClamAvHost))
+        if (!processing.Value.DirectPublicUploadEnabled &&
+            (!processing.Value.Enabled || string.IsNullOrWhiteSpace(processing.Value.ClamAvHost)))
             throw new InvalidOperationException("Production media processing requires an enabled ClamAV worker.");
         using var scope = scopeFactory.CreateScope();
         var mediaStorage = scope.ServiceProvider.GetRequiredService<IStorageService>();

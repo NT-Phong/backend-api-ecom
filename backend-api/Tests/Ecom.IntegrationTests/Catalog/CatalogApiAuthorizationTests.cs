@@ -103,6 +103,93 @@ public sealed class CatalogApiAuthorizationTests(PostgreSqlFixture fixture)
         await AssertSuccessEnvelopeAsync(response);
     }
 
+    [PostgreSqlFact]
+    public async Task Producer_picker_requires_product_create_permission_and_returns_only_eligible_producers()
+    {
+        await fixture.ResetDatabaseAsync();
+        var now = DateTime.UtcNow;
+        await using (var context = fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "Tbl_Producer" ("Id", "Code", "Name", "PublicStatus", "IsVerified", "CreatedAt", "IsDeleted", "ConcurrencyStamp")
+                VALUES
+                    ({Guid.NewGuid()}, {"PICKER_OK"}, {"Eligible Producer"}, {"Published"}, {true}, {now}, {false}, {Guid.NewGuid()}),
+                    ({Guid.NewGuid()}, {"PICKER_DRAFT"}, {"Draft Producer"}, {"Draft"}, {true}, {now}, {false}, {Guid.NewGuid()}),
+                    ({Guid.NewGuid()}, {"PICKER_UNVERIFIED"}, {"Unverified Producer"}, {"Published"}, {false}, {now}, {false}, {Guid.NewGuid()});
+                """);
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+
+        using var unauthorized = await client.GetAsync("/api/v1/catalog/producers");
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(Permissions.CatalogProducts.Read));
+        using var forbidden = await client.GetAsync("/api/v1/catalog/producers");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(Permissions.CatalogProducts.Create));
+        using var response = await client.GetAsync("/api/v1/catalog/producers?q=producer");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var items = document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray().ToList();
+        Assert.Single(items);
+        Assert.Equal("PICKER_OK", items[0].GetProperty("code").GetString());
+    }
+
+    [PostgreSqlFact]
+    public async Task Producer_picker_supports_paging_and_hides_ineligible_detail_records()
+    {
+        await fixture.ResetDatabaseAsync();
+        var now = DateTime.UtcNow;
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var draftId = Guid.NewGuid();
+        await using (var context = fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "Tbl_Producer" ("Id", "Code", "Name", "PublicStatus", "IsVerified", "CreatedAt", "IsDeleted", "ConcurrencyStamp")
+                VALUES
+                    ({firstId}, {"ELIGIBLE_A"}, {"Eligible Alpha"}, {"Published"}, {true}, {now}, {false}, {Guid.NewGuid()}),
+                    ({secondId}, {"ELIGIBLE_B"}, {"Eligible Beta"}, {"Published"}, {true}, {now}, {false}, {Guid.NewGuid()}),
+                    ({draftId}, {"ELIGIBLE_DRAFT"}, {"Eligible Draft"}, {"Draft"}, {true}, {now}, {false}, {Guid.NewGuid()});
+                """);
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(Permissions.CatalogProducts.Create));
+
+        using var paged = await client.GetAsync("/api/v1/catalog/producers?q=eligible&page=2&pageSize=1");
+        Assert.Equal(HttpStatusCode.OK, paged.StatusCode);
+        using (var document = JsonDocument.Parse(await paged.Content.ReadAsStringAsync()))
+        {
+            var data = document.RootElement.GetProperty("data");
+            Assert.Equal(2, data.GetProperty("totalCount").GetInt32());
+            Assert.Equal(2, data.GetProperty("pageNumber").GetInt32());
+            var item = Assert.Single(data.GetProperty("items").EnumerateArray());
+            Assert.Equal(secondId, item.GetProperty("id").GetGuid());
+        }
+
+        using var detail = await client.GetAsync($"/api/v1/catalog/producers/{firstId}");
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        using (var document = JsonDocument.Parse(await detail.Content.ReadAsStringAsync()))
+        {
+            var data = document.RootElement.GetProperty("data");
+            Assert.Equal(firstId, data.GetProperty("id").GetGuid());
+            Assert.Equal("ELIGIBLE_A", data.GetProperty("code").GetString());
+            Assert.True(data.GetProperty("isVerified").GetBoolean());
+            Assert.Equal("Published", data.GetProperty("publicStatus").GetString());
+        }
+
+        using var hiddenDetail = await client.GetAsync($"/api/v1/catalog/producers/{draftId}");
+        Assert.Equal(HttpStatusCode.NotFound, hiddenDetail.StatusCode);
+
+        using var invalidPage = await client.GetAsync("/api/v1/catalog/producers?page=0&pageSize=101");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidPage.StatusCode);
+    }
+
     private static string CreateAccessToken(params string[] permissions)
     {
         var claims = permissions.Select(permission => new Claim("policy", permission)).Append(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));

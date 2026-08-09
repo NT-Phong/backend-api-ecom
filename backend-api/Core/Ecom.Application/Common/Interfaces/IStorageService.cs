@@ -11,6 +11,8 @@ public interface IStorageService
     Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default);
     Task<string> UploadToQuarantineAsync(Stream fileStream, string safeExtension, string contentType,
         CancellationToken cancellationToken = default);
+    Task<string> UploadToPublicAsync(Stream fileStream, string safeExtension, string contentType,
+        CancellationToken cancellationToken = default);
     Task<string> PromoteAsync(string quarantineKey, MediaVisibility targetVisibility, CancellationToken cancellationToken = default);
     Task DeleteIfExistsAsync(string storageKey, CancellationToken cancellationToken = default);
 }

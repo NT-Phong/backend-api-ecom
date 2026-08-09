@@ -17,6 +17,9 @@ public sealed record CatalogProductManagementDto(Guid Id, Guid ProducerId, strin
 public sealed record CatalogProductListItemDto(Guid Id, Guid ProducerId, string Name, string Slug,
     ProductStatus Status, DateTime CreatedAt, DateTime? UpdatedAt, CategorySummaryDto? PrimaryCategory);
 
+public sealed record CatalogProducerPickerDto(Guid Id, string Code, string Name, PublicStatus PublicStatus,
+    bool IsVerified);
+
 public sealed record CatalogProductMediaDto(Guid MediaAssetId, string OriginalFileName, string ContentType,
     MediaType MediaType, MediaVisibility Visibility, MediaScanStatus ScanStatus, int DisplayOrder,
     bool IsPrimary, string? Caption);

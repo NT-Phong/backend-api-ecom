@@ -29,6 +29,58 @@ public class MediaTests
     }
 
     [Fact]
+    public void Manual_retry_resets_the_internal_retry_budget_and_failure_details()
+    {
+        var now = DateTime.UtcNow;
+        var media = MediaAsset.CreatePending("quarantine/image.jpg", "image.jpg", "image/jpeg", 128,
+            MediaType.Image, MediaVisibility.Restricted);
+        media.ScheduleScanRetry(now.AddMinutes(1));
+        media.ScheduleScanRetry(now.AddMinutes(2));
+        media.MarkScanFailed(MediaScanFailureCodes.ScannerUnavailable,
+            "The malware scanner is temporarily unavailable.", now.AddMinutes(3));
+
+        media.RetryScan();
+
+        Assert.Equal(MediaScanStatus.Pending, media.ScanStatus);
+        Assert.Equal(0, media.ScanAttemptCount);
+        Assert.Null(media.ScanFailureCode);
+        Assert.Null(media.ScanFailureReason);
+        Assert.Null(media.NextScanAttemptAt);
+        Assert.Null(media.ScanLeaseExpiresAt);
+    }
+
+    [Fact]
+    public void Terminal_scan_states_clear_a_stale_retry_schedule_and_lease()
+    {
+        var now = DateTime.UtcNow;
+        var clean = MediaAsset.CreatePending("quarantine/clean.jpg", "clean.jpg", "image/jpeg", 128,
+            MediaType.Image, MediaVisibility.Restricted);
+        clean.ScheduleScanRetry(now.AddMinutes(1));
+        Assert.True(clean.TryClaimScan(now.AddMinutes(1), TimeSpan.FromMinutes(5)));
+
+        clean.MarkClean(now.AddMinutes(2));
+
+        Assert.Null(clean.NextScanAttemptAt);
+        Assert.Null(clean.ScanLeaseExpiresAt);
+
+        var failed = MediaAsset.CreatePending("quarantine/failed.jpg", "failed.jpg", "image/jpeg", 128,
+            MediaType.Image, MediaVisibility.Restricted);
+        failed.ScheduleScanRetry(now.AddMinutes(1));
+        failed.MarkScanFailed(MediaScanFailureCodes.ScannerUnavailable, "Scanner unavailable", now.AddMinutes(2));
+
+        Assert.Null(failed.NextScanAttemptAt);
+        Assert.Null(failed.ScanLeaseExpiresAt);
+
+        var rejected = MediaAsset.CreatePending("quarantine/rejected.jpg", "rejected.jpg", "image/jpeg", 128,
+            MediaType.Image, MediaVisibility.Restricted);
+        rejected.ScheduleScanRetry(now.AddMinutes(1));
+        rejected.Reject("Rejected", now.AddMinutes(2));
+
+        Assert.Null(rejected.NextScanAttemptAt);
+        Assert.Null(rejected.ScanLeaseExpiresAt);
+    }
+
+    [Fact]
     public void Media_must_be_clean_before_becoming_public()
     {
         var media = MediaAsset.CreatePending("quarantine/image.jpg", "image.jpg", "image/jpeg", 128,

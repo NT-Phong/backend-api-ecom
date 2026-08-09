@@ -3,7 +3,8 @@ using Ecom.Domain.Entities;
 namespace Ecom.Application.Features.Media.Commands.CreatePendingMedia;
 
 public sealed record CreatePendingMediaCommand(string StorageKey, ValidatedMediaUpload Upload,
-    MediaUploadIntent Intent, string? AltText) : IRequest<TResult<MediaAssetResult>>, ITransactionalRequest;
+    MediaUploadIntent Intent, string? AltText, bool DirectPublicUpload = false)
+    : IRequest<TResult<MediaAssetResult>>, ITransactionalRequest;
 
 public sealed class CreatePendingMediaCommandValidator : AbstractValidator<CreatePendingMediaCommand>
 {
@@ -29,6 +30,8 @@ public sealed class CreatePendingMediaCommandHandler(IUnitOfWork unitOfWork, ICu
         var media = MediaAsset.CreatePending(request.StorageKey, request.Upload.OriginalFileName,
             request.Upload.ContentType, request.Upload.SizeBytes, request.Upload.MediaType,
             MediaVisibility.Restricted, request.Intent, request.Upload.TargetVisibility, request.AltText);
+        if (request.DirectPublicUpload)
+            media.MarkClean(request.StorageKey, MediaVisibility.Public, DateTime.UtcNow);
         await unitOfWork.Repository<MediaAsset>().InsertAsync(media, cancellationToken);
         return TResult<MediaAssetResult>.Success(new MediaAssetResult(media.Id, media.OriginalFileName,
             media.ContentType, media.SizeBytes, media.MediaType, media.Visibility, media.ScanStatus,

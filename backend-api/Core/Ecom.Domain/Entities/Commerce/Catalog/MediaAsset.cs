@@ -12,6 +12,7 @@ public class MediaAsset : BaseEntity
     public MediaVisibility Visibility { get; private set; }
     public MediaScanStatus ScanStatus { get; private set; }
     public DateTime? ScannedAt { get; private set; }
+    public string? ScanFailureCode { get; private set; }
     public string? ScanFailureReason { get; private set; }
     public string? ThumbnailStorageKey { get; private set; }
     public string? Sha256 { get; private set; }
@@ -59,7 +60,10 @@ public class MediaAsset : BaseEntity
         EnsureOccurredAt(scannedAt);
         ScanStatus = MediaScanStatus.Clean;
         ScannedAt = scannedAt;
+        ScanFailureCode = null;
         ScanFailureReason = null;
+        NextScanAttemptAt = null;
+        ScanLeaseExpiresAt = null;
     }
 
     public void MarkClean(string promotedStorageKey, MediaVisibility visibility, DateTime scannedAt)
@@ -101,9 +105,11 @@ public class MediaAsset : BaseEntity
         ScanLeaseExpiresAt = null;
     }
 
-    public void Reject(string reason, DateTime scannedAt) => CompleteFailedScan(MediaScanStatus.Rejected, reason, scannedAt);
+    public void Reject(string reason, DateTime scannedAt) =>
+        CompleteFailedScan(MediaScanStatus.Rejected, MediaScanFailureCodes.FileRejected, reason, scannedAt);
 
-    public void MarkScanFailed(string reason, DateTime scannedAt) => CompleteFailedScan(MediaScanStatus.Failed, reason, scannedAt);
+    public void MarkScanFailed(string failureCode, string reason, DateTime scannedAt) =>
+        CompleteFailedScan(MediaScanStatus.Failed, failureCode, reason, scannedAt);
 
     public void RetryScan()
     {
@@ -111,7 +117,9 @@ public class MediaAsset : BaseEntity
             throw new CommerceDomainException("MEDIA_SCAN_RETRY_INVALID", "Only a failed media scan can be retried.");
         ScanStatus = MediaScanStatus.Pending;
         ScannedAt = null;
+        ScanFailureCode = null;
         ScanFailureReason = null;
+        ScanAttemptCount = 0;
         NextScanAttemptAt = null;
         ScanLeaseExpiresAt = null;
     }
@@ -125,15 +133,19 @@ public class MediaAsset : BaseEntity
 
     public void UpdateAltText(string? altText) => AltText = altText?.Trim();
 
-    private void CompleteFailedScan(MediaScanStatus target, string reason, DateTime scannedAt)
+    private void CompleteFailedScan(MediaScanStatus target, string failureCode, string reason, DateTime scannedAt)
     {
         EnsurePendingScan();
         EnsureOccurredAt(scannedAt);
+        if (string.IsNullOrWhiteSpace(failureCode))
+            throw new CommerceDomainException("MEDIA_SCAN_FAILURE_CODE_REQUIRED", "A media scan failure code is required.");
         if (string.IsNullOrWhiteSpace(reason))
             throw new CommerceDomainException("MEDIA_SCAN_REASON_REQUIRED", "A scan failure reason is required.");
         ScanStatus = target;
         ScannedAt = scannedAt;
+        ScanFailureCode = failureCode.Trim();
         ScanFailureReason = reason.Trim();
+        NextScanAttemptAt = null;
         ScanLeaseExpiresAt = null;
         if (Visibility == MediaVisibility.Public)
             Visibility = MediaVisibility.Restricted;
@@ -154,4 +166,13 @@ public class MediaAsset : BaseEntity
     private MediaAsset()
     {
     }
+}
+
+public static class MediaScanFailureCodes
+{
+    public const string FileRejected = "FILE_REJECTED";
+    public const string ScannerUnavailable = "SCANNER_UNAVAILABLE";
+    public const string ThumbnailGenerationFailed = "THUMBNAIL_GENERATION_FAILED";
+    public const string StorageProcessingFailed = "STORAGE_PROCESSING_FAILED";
+    public const string ProcessingFailed = "MEDIA_PROCESSING_FAILED";
 }
