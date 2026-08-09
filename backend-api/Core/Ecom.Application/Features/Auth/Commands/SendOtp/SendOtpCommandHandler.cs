@@ -34,7 +34,8 @@ public class SendOtpCommandHandler(
             if (rateLimit.Status == AuthRateLimitStatus.Rejected)
                 return TResult<SendOtpResult>.Failure(MessageKey.TooManyRequests, ErrorCodes.TOO_MANY_REQUESTS);
         }
-        if (!smsSender.IsConfigured && !otpSecurity.IsDevelopmentTestAccount(phoneNumber))
+        var testOtp = otpSecurity.GetTestOtp(phoneNumber, request.ControlledTestBypassKey);
+        if (!smsSender.IsConfigured && testOtp is null)
             return TResult<SendOtpResult>.Failure(MessageKey.AuthDependencyUnavailable, ErrorCodes.SERVICE_UNAVAILABLE);
 
         try
@@ -76,10 +77,16 @@ public class SendOtpCommandHandler(
                 return Accepted();
             }
 
-            var isDevelopmentTestAccount = otpSecurity.IsDevelopmentTestAccount(phoneNumber);
-            var otpCode = isDevelopmentTestAccount
-                ? otpSecurity.DevelopmentOtp
-                : otpSecurity.GenerateCode();
+            // The controlled test bypass is authorized by a separate request header on
+            // both OTP endpoints. Do not persist its predictable code as an OtpToken.
+            if (testOtp is not null)
+            {
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Controlled OTP test bypass accepted. UserId: {UserId}", user.Id);
+                return Accepted();
+            }
+
+            var otpCode = otpSecurity.GenerateCode();
             var protectedCode = otpSecurity.Protect(user.Id, purpose, otpCode);
 
             if (existingOtp is not null)
@@ -103,7 +110,7 @@ public class SendOtpCommandHandler(
                 }, cancellationToken);
             }
 
-            if (!isDevelopmentTestAccount)
+            if (testOtp is null)
             {
                 await smsSender.SendAsync(
                     phoneNumber,
@@ -115,7 +122,7 @@ public class SendOtpCommandHandler(
             await unitOfWork.SaveChangesAsync(cancellationToken);
             logger.LogInformation("OTP request accepted. UserId: {UserId}, Purpose: {Purpose}", user.Id, purpose);
 
-            return Accepted(otpSecurity.CanExposeDevelopmentOtp && isDevelopmentTestAccount ? otpCode : null);
+            return Accepted(otpSecurity.CanExposeDevelopmentOtp && otpSecurity.IsDevelopmentTestAccount(phoneNumber) ? otpCode : null);
         }
         catch (InvalidOperationException ex)
         {

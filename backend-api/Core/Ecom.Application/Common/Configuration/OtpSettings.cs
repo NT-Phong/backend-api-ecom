@@ -47,5 +47,16 @@ public class OtpSettings
     /// Allows returning a development OTP in the existing V1 DTO. Rejected outside Development.
     /// </summary>
     public bool ExposeDevelopmentOtp { get; set; }
+
+    /// <summary>
+    /// Enables a temporary, server-to-server test OTP bypass outside Development.
+    /// It is restricted to one configured phone number, requires a secret request header,
+    /// and stops working within 24 hours at <see cref="ControlledTestBypassExpiresAtUtc"/>.
+    /// </summary>
+    public bool EnableControlledTestBypass { get; set; }
+    public string ControlledTestPhoneNumber { get; set; } = string.Empty;
+    public string ControlledTestOtp { get; set; } = string.Empty;
+    public string ControlledTestBypassKey { get; set; } = string.Empty;
+    public DateTimeOffset? ControlledTestBypassExpiresAtUtc { get; set; }
 }
 

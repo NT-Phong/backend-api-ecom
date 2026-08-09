@@ -87,6 +87,39 @@ public sealed class AuthenticationContainmentTests
     }
 
     [Fact]
+    public void Controlled_test_bypass_requires_matching_phone_secret_and_unexpired_configuration()
+    {
+        var service = CreateOtpService(
+            Environments.Production,
+            enableControlledTestBypass: true,
+            controlledTestPhoneNumber: TestAccounts.Admin,
+            controlledTestBypassKey: "integration-test-controlled-bypass-key-32-characters",
+            controlledTestBypassExpiresAtUtc: DateTimeOffset.UtcNow.AddMinutes(5));
+
+        Assert.Equal("0000", service.GetTestOtp(TestAccounts.Admin, "integration-test-controlled-bypass-key-32-characters"));
+        Assert.Null(service.GetTestOtp(TestAccounts.Admin, "wrong-key"));
+        Assert.Null(service.GetTestOtp(TestAccounts.Manager, "integration-test-controlled-bypass-key-32-characters"));
+    }
+
+    [Fact]
+    public void Controlled_test_bypass_requires_a_future_expiration()
+    {
+        var validator = new OtpSettingsValidator(new TestHostEnvironment(Environments.Production));
+        var result = validator.Validate(null, new OtpSettings
+        {
+            HashKey = OtpHashKey,
+            EnableControlledTestBypass = true,
+            ControlledTestPhoneNumber = TestAccounts.Admin,
+            ControlledTestOtp = "0000",
+            ControlledTestBypassKey = "integration-test-controlled-bypass-key-32-characters",
+            ControlledTestBypassExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
+        });
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, failure => failure.Contains("ExpiresAtUtc", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Missing_sms_provider_is_explicitly_fail_closed()
     {
         var sender = new SmsSender();
@@ -234,7 +267,11 @@ public sealed class AuthenticationContainmentTests
         string environment,
         bool enableTestAccounts = false,
         bool enableFixedOtp = false,
-        string? testPhoneNumber = null) =>
+        string? testPhoneNumber = null,
+        bool enableControlledTestBypass = false,
+        string? controlledTestPhoneNumber = null,
+        string? controlledTestBypassKey = null,
+        DateTimeOffset? controlledTestBypassExpiresAtUtc = null) =>
         new(
             Options.Create(new OtpSettings
             {
@@ -245,7 +282,12 @@ public sealed class AuthenticationContainmentTests
                 EnableDevelopmentTestAccounts = enableTestAccounts,
                 EnableDevelopmentFixedOtp = enableFixedOtp,
                 ExposeDevelopmentOtp = enableTestAccounts
-                    || enableFixedOtp
+                    || enableFixedOtp,
+                EnableControlledTestBypass = enableControlledTestBypass,
+                ControlledTestPhoneNumber = controlledTestPhoneNumber ?? string.Empty,
+                ControlledTestOtp = "0000",
+                ControlledTestBypassKey = controlledTestBypassKey ?? string.Empty,
+                ControlledTestBypassExpiresAtUtc = controlledTestBypassExpiresAtUtc
             }),
             new TestHostEnvironment(environment));
 

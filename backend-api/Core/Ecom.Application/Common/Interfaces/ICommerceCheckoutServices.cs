@@ -34,6 +34,8 @@ public interface IOrderLifecycleStore
     Task<Shipment?> LockShipmentAsync(Guid orderId, CancellationToken cancellationToken);
     Task<PaymentGatewayAttempt?> LockPaymentGatewayAttemptAsync(string provider, string invoiceNumber,
         CancellationToken cancellationToken);
+    Task<PaymentBankQrAttempt?> LockPaymentBankQrAttemptAsync(string provider, string paymentCode,
+        CancellationToken cancellationToken);
 }
 
 public interface IIdempotencyStore
@@ -56,4 +58,17 @@ public interface ISePayCheckoutService
     bool IsEnabled { get; }
     SePayCheckoutForm CreateCheckoutForm(SePayCheckoutRequest request);
     bool IsValidIpnSecret(string? suppliedSecret);
+}
+
+public sealed record SePayVietQrForm(string QrImageUrl, string BankCode, string VirtualAccountDisplay,
+    string AccountHolder, decimal Amount, string CurrencyCode, string PaymentCode, DateTime ExpiresAt);
+
+public interface ISePayBankQrService
+{
+    bool IsEnabled { get; }
+    string PaymentCodePrefix { get; }
+    string VirtualAccountFingerprint { get; }
+    SePayVietQrForm CreateQrForm(decimal amount, string paymentCode, DateTime expiresAt);
+    bool IsValidWebhookSignature(string? timestamp, string rawBody, string? suppliedSignature);
+    bool IsExpectedVirtualAccount(string? suppliedAccountNumber);
 }

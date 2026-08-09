@@ -3,6 +3,7 @@ using Ecom.Application.Features.Commerce.Orders.Commands.CancelOrder;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetOrder;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetOrders;
 using Ecom.Application.Features.Commerce.Payments.Commands.CreateSePayCheckout;
+using Ecom.Application.Features.Commerce.Payments.Commands.CreateSePayVietQr;
 using Ecom.Application.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -38,6 +39,12 @@ public sealed class OrdersController : BaseController
     [EnableRateLimiting(CommerceRateLimitPolicyNames.PaymentCheckout)]
     public async Task<IActionResult> CreateSePayCheckout(Guid orderId, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(new CreateSePayCheckoutCommand(orderId), cancellationToken));
+
+    [HttpPost("{orderId:guid}/payments/sepay-vietqr")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(CommerceRateLimitPolicyNames.PaymentCheckout)]
+    public async Task<IActionResult> CreateSePayVietQr(Guid orderId, CancellationToken cancellationToken) =>
+        HandleResult(await Mediator.Send(new CreateSePayVietQrCommand(orderId), cancellationToken));
 
     [HttpPost("{orderId:guid}/cancel")]
     [ValidateAntiForgeryToken]

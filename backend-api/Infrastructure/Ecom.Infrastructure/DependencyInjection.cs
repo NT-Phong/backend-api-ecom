@@ -50,6 +50,10 @@ public static class DependencyInjection
         services.AddOptions<SePayOptions>()
             .Bind(configuration.GetSection(SePayOptions.SectionName))
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SePayBankQrOptions>, SePayBankQrOptionsValidator>();
+        services.AddOptions<SePayBankQrOptions>()
+            .Bind(configuration.GetSection(SePayBankQrOptions.SectionName))
+            .ValidateOnStart();
         services.AddSingleton<IValidateOptions<PasswordAuthenticationV2Options>, PasswordAuthenticationV2OptionsValidator>();
         services.AddOptions<PasswordAuthenticationV2Options>()
             .Bind(configuration.GetSection(PasswordAuthenticationV2Options.SectionName))
@@ -115,6 +119,7 @@ public static class DependencyInjection
         services.AddScoped<IDateTimeService, DateTimeService>();
         services.AddScoped<IHelperService, HelperService>();
         services.AddSingleton<ISePayCheckoutService, SePayCheckoutService>();
+        services.AddSingleton<ISePayBankQrService, SePayBankQrService>();
         if (string.Equals(configuration[$"{MediaStorageOptions.SectionName}:Provider"], "Azure", StringComparison.OrdinalIgnoreCase))
             services.AddScoped<IStorageService, AzureBlobStorageService>();
         else

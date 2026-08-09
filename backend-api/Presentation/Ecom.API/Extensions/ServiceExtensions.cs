@@ -127,6 +127,7 @@ public static class ServiceExtensions
             AddIpPolicy(options, CommerceRateLimitPolicyNames.OrderCreate, commerceSettings.OrderCreate);
             AddIpPolicy(options, CommerceRateLimitPolicyNames.PaymentCheckout, commerceSettings.PaymentCheckout);
             AddIpPolicy(options, CommerceRateLimitPolicyNames.PaymentIpn, commerceSettings.PaymentIpn);
+            AddIpPolicy(options, CommerceRateLimitPolicyNames.PaymentBankWebhook, commerceSettings.PaymentBankWebhook);
             AddIpPolicy(options, CommerceRateLimitPolicyNames.ManagementMutation, commerceSettings.ManagementMutation);
         });
     }

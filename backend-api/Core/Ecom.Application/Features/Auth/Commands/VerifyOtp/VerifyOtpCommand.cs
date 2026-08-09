@@ -15,6 +15,9 @@ public record VerifyOtpCommand : IRequest<TResult<VerifyOtpResult>>
     /// Mã OTP
     /// </summary>
     public string OtpCode { get; set; } = string.Empty;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ControlledTestBypassKey { get; init; }
 }
 
 /// <summary>

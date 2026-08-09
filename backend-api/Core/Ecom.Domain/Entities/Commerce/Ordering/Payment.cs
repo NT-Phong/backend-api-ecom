@@ -27,7 +27,7 @@ public class Payment : BaseEntity, IAggregateRoot
         };
     }
 
-    public bool RequiresPrepayment() => Method is PaymentMethod.BankTransfer or PaymentMethod.SePay;
+    public bool RequiresPrepayment() => Method is PaymentMethod.BankTransfer or PaymentMethod.SePay or PaymentMethod.SePayVietQr;
 
     public PaymentTransaction MarkAwaitingConfirmation(string provider, DateTime occurredAt)
     {

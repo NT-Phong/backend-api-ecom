@@ -129,12 +129,12 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 		VerifyOtpCommand request,
 		CancellationToken cancellationToken)
 	{
-		// Fixed OTP is available only when both Development and the explicit option are active.
-		if (_otpSecurity.IsDevelopmentTestAccount(request.PhoneNumber))
+		var testOtp = _otpSecurity.GetTestOtp(request.PhoneNumber, request.ControlledTestBypassKey);
+		if (testOtp is not null)
 		{
 			var testRateLimit = await _rateLimiter.AcquireAsync(
 				AuthRateLimitPolicyNames.OtpVerifyChallenge,
-				$"{user.Id:N}:development",
+				$"{user.Id:N}:test-bypass",
 				cancellationToken);
 			return new OtpVerificationAttempt(_otpSecurity.Verify(
 				user.Id,
@@ -143,7 +143,7 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 				_otpSecurity.Protect(
 					user.Id,
 					user.Status == UserStatusEnum.Pending ? OtpTokenTypeEnum.ActivateAccount : OtpTokenTypeEnum.Login,
-					_otpSecurity.DevelopmentOtp)), testRateLimit.Status);
+				testOtp)), testRateLimit.Status);
 		}
 
 		var inferredType = user.Status == UserStatusEnum.Pending

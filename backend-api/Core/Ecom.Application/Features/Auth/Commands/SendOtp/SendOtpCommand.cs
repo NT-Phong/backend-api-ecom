@@ -16,6 +16,9 @@ public record SendOtpCommand : IRequest<TResult<SendOtpResult>>
     /// Nguồn đăng nhập (web hoặc mobile)
     /// </summary>
     public string? LoginSource { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ControlledTestBypassKey { get; init; }
 }
 
 /// <summary>

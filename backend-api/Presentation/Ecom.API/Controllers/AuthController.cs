@@ -33,6 +33,7 @@ namespace Ecom.API.Controllers;
 [Route("api/v{version:apiVersion}/auth")]
 public class AuthController : BaseController
 {
+    private const string ControlledTestBypassHeader = "X-Ecom-Test-Otp-Key";
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(ILogger<AuthController> logger)
@@ -79,7 +80,10 @@ public class AuthController : BaseController
     {
         _logger.LogInformation("SendOtp request received");
 
-        var result = await Mediator.Send(command, cancellationToken);
+        var result = await Mediator.Send(command with
+        {
+            ControlledTestBypassKey = Request.Headers[ControlledTestBypassHeader].ToString()
+        }, cancellationToken);
         return HandleResult(result);
     }
 
@@ -102,7 +106,10 @@ public class AuthController : BaseController
     {
         _logger.LogInformation("VerifyOtp request received");
 
-        var result = await Mediator.Send(command, cancellationToken);
+        var result = await Mediator.Send(command with
+        {
+            ControlledTestBypassKey = Request.Headers[ControlledTestBypassHeader].ToString()
+        }, cancellationToken);
         return HandleResult(result);
     }
     /// <summary>

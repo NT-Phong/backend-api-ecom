@@ -7,6 +7,7 @@ public static class CommerceRateLimitPolicyNames
     public const string OrderCreate = "commerce-order-create";
     public const string PaymentCheckout = "commerce-payment-checkout";
     public const string PaymentIpn = "commerce-payment-ipn";
+    public const string PaymentBankWebhook = "commerce-payment-bank-webhook";
     public const string ManagementMutation = "commerce-management-mutation";
 }
 
@@ -19,5 +20,6 @@ public sealed class CommerceRateLimitOptions
     public RateLimitRule OrderCreate { get; set; } = new(10, 60);
     public RateLimitRule PaymentCheckout { get; set; } = new(20, 60);
     public RateLimitRule PaymentIpn { get; set; } = new(120, 60);
+    public RateLimitRule PaymentBankWebhook { get; set; } = new(120, 60);
     public RateLimitRule ManagementMutation { get; set; } = new(60, 60);
 }

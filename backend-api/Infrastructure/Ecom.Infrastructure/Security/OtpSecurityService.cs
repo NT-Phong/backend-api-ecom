@@ -73,6 +73,23 @@ public sealed class OtpSecurityService : IOtpSecurityService
             : TestAccounts.All.Contains(phoneNumber, StringComparer.Ordinal);
     }
 
+    public string? GetTestOtp(string phoneNumber, string? controlledBypassKey)
+    {
+        if (IsDevelopmentTestAccount(phoneNumber))
+            return DevelopmentOtp;
+
+        if (!_settings.EnableControlledTestBypass ||
+            !_settings.ControlledTestBypassExpiresAtUtc.HasValue ||
+            _settings.ControlledTestBypassExpiresAtUtc <= DateTimeOffset.UtcNow ||
+            !string.Equals(phoneNumber, _settings.ControlledTestPhoneNumber.Trim(), StringComparison.Ordinal) ||
+            !FixedTimeEquals(controlledBypassKey, _settings.ControlledTestBypassKey))
+        {
+            return null;
+        }
+
+        return _settings.ControlledTestOtp;
+    }
+
     private byte[] ComputeDigest(Guid userId, OtpTokenTypeEnum purpose, string code)
     {
         if (string.IsNullOrWhiteSpace(_settings.HashKey) || _settings.HashKey.Length < 32)
@@ -82,8 +99,11 @@ public sealed class OtpSecurityService : IOtpSecurityService
         return hmac.ComputeHash(Encoding.UTF8.GetBytes($"{userId:N}:{(int)purpose}:{code}"));
     }
 
-    private static bool FixedTimeEquals(string left, string right)
+    private static bool FixedTimeEquals(string? left, string? right)
     {
+        if (left is null || right is null)
+            return false;
+
         var leftBytes = Encoding.UTF8.GetBytes(left);
         var rightBytes = Encoding.UTF8.GetBytes(right);
         return leftBytes.Length == rightBytes.Length &&

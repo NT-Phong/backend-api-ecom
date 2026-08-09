@@ -108,6 +108,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<PaymentGatewayAttempt> PaymentGatewayAttempts => Set<PaymentGatewayAttempt>();
     public DbSet<PaymentGatewayNotification> PaymentGatewayNotifications => Set<PaymentGatewayNotification>();
+    public DbSet<PaymentBankQrAttempt> PaymentBankQrAttempts => Set<PaymentBankQrAttempt>();
+    public DbSet<PaymentBankQrWebhookNotification> PaymentBankQrWebhookNotifications => Set<PaymentBankQrWebhookNotification>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
     public DbSet<ShipmentItem> ShipmentItems => Set<ShipmentItem>();
     public DbSet<ShipmentHistory> ShipmentHistories => Set<ShipmentHistory>();

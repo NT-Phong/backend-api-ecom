@@ -38,4 +38,12 @@ SELECT * FROM ""Tbl_PaymentGatewayAttempt""
 WHERE ""Provider"" = {provider} AND ""InvoiceNumber"" = {invoiceNumber} AND ""IsDeleted"" = false
 FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
+
+    public Task<PaymentBankQrAttempt?> LockPaymentBankQrAttemptAsync(string provider, string paymentCode,
+        CancellationToken cancellationToken) =>
+        db.PaymentBankQrAttempts.FromSqlInterpolated($@"
+SELECT * FROM ""Tbl_PaymentBankQrAttempt""
+WHERE ""Provider"" = {provider} AND ""PaymentCode"" = {paymentCode} AND ""IsDeleted"" = false
+FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
 }

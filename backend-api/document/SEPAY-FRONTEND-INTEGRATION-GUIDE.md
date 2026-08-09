@@ -3,6 +3,18 @@
 **Phạm vi:** Storefront Thanh Hoa Commerce, API `v1`, luồng Cart -> Preview -> Create Order -> Hosted Checkout -> IPN-confirmed Order Status.  
 **Nguồn sự thật:** source backend hiện tại. SePay vẫn đang tắt mặc định; chỉ dùng guide này sau khi môi trường Sandbox/Production đã được bật và qua gate vận hành.
 
+## 0. Production gate: frontend origin, cookie và CSRF
+
+**Trạng thái source hiện tại:** API cho phép CORS theo `Cors:AllowedOrigins` và có `AllowCredentials()`. Tuy nhiên cookie guest cart, session và CSRF đều đang là `Secure; HttpOnly; SameSite=Lax`. Vì vậy một SPA tại `https://market-prototype.vercel.app` gọi trực tiếp API Azure ở origin khác không phải là nền tảng tin cậy cho luồng guest checkout: trình duyệt có thể không gửi/lưu cookie cross-site trong XHR/fetch, dù FE đặt `credentials: "include"`.
+
+Trước khi FE bật checkout Production, team phải chọn và kiểm thử **một** phương án:
+
+1. **Khuyến nghị:** đưa API qua reverse proxy/BFF cùng origin storefront (FE gọi `/api/v1/...` trên domain storefront). Cookie không còn là cross-site.
+2. Đổi cookie backend sang `SameSite=None; Secure` và giữ CORS exact-origin + `AllowCredentials`. Đây là thay đổi bảo mật/runtime, cần review riêng trước khi áp dụng.
+3. Thiết kế storefront chỉ dùng bearer-authenticated checkout và loại bỏ/thiết kế lại guest-cookie flow. Không được giả định guest cart hiện tại tự hoạt động cross-origin.
+
+Chỉ thêm `https://market-prototype.vercel.app` vào `Cors:AllowedOrigins` **không tự giải quyết** giới hạn SameSite. Test thật trên Chrome/Safari với guest cart, `GET /security/csrf`, preview, create order và đọc order sau redirect trước khi go-live.
+
 ## 1. Nguyên tắc bắt buộc
 
 1. FE chỉ gửi lựa chọn mua hàng, địa chỉ, phương thức `SePay`, quote fingerprint và idempotency key. Không gửi hoặc tính lại số tiền thanh toán.

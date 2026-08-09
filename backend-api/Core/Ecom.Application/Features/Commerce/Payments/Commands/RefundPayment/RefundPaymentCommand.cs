@@ -30,7 +30,7 @@ public sealed class RefundPaymentCommandHandler(IUnitOfWork unitOfWork, ICurrent
             return TResult.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
         if (payment.Status != PaymentStatus.Paid)
             return TResult.Failure("Only a paid order can be refunded.", ErrorCodes.UNPROCESSABLE_ENTITY);
-        if (payment.Method == PaymentMethod.SePay)
+        if (payment.Method is PaymentMethod.SePay or PaymentMethod.SePayVietQr)
             return TResult.Failure("SePay refunds require the approved provider reconciliation workflow.", ErrorCodes.UNPROCESSABLE_ENTITY);
 
         var items = await unitOfWork.Repository<OrderItem>().Query().Where(x => x.OrderId == order.Id)

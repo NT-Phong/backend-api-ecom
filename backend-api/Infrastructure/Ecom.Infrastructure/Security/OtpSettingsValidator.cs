@@ -28,6 +28,21 @@ public sealed class OtpSettingsValidator(IHostEnvironment environment) : IValida
         {
             failures.Add("Otp:DefaultOtp must be numeric and match Otp:OtpLength when a Development OTP mode is enabled.");
         }
+        if (options.EnableControlledTestBypass)
+        {
+            if (string.IsNullOrWhiteSpace(options.ControlledTestPhoneNumber))
+                failures.Add("Otp:ControlledTestPhoneNumber is required when the controlled test bypass is enabled.");
+            if (options.ControlledTestOtp.Length != options.OtpLength || !options.ControlledTestOtp.All(char.IsDigit))
+                failures.Add("Otp:ControlledTestOtp must be numeric and match Otp:OtpLength when the controlled test bypass is enabled.");
+            if (string.IsNullOrWhiteSpace(options.ControlledTestBypassKey) || options.ControlledTestBypassKey.Length < 32)
+                failures.Add("Otp:ControlledTestBypassKey must contain at least 32 characters when the controlled test bypass is enabled.");
+            if (!options.ControlledTestBypassExpiresAtUtc.HasValue ||
+                options.ControlledTestBypassExpiresAtUtc <= DateTimeOffset.UtcNow ||
+                options.ControlledTestBypassExpiresAtUtc > DateTimeOffset.UtcNow.AddHours(24))
+            {
+                failures.Add("Otp:ControlledTestBypassExpiresAtUtc must be a future UTC timestamp within 24 hours when the controlled test bypass is enabled.");
+            }
+        }
 
         return failures.Count == 0
             ? ValidateOptionsResult.Success
