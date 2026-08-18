@@ -10,4 +10,19 @@ public class OrderNote : BaseEntity
     private OrderNote()
     {
     }
+
+    public static OrderNote CreateInternal(Guid orderId, Guid authorUserId, string content)
+    {
+        if (orderId == Guid.Empty || authorUserId == Guid.Empty || string.IsNullOrWhiteSpace(content))
+            throw new CommerceDomainException("ORDER_NOTE_REQUIRED", "Order, author, and note content are required.");
+
+        return new OrderNote
+        {
+            OrderId = orderId,
+            AuthorUserId = authorUserId,
+            NoteType = OrderNoteType.Internal,
+            Content = content.Trim(),
+            IsVisibleToCustomer = false
+        };
+    }
 }

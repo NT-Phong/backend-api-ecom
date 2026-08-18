@@ -56,7 +56,8 @@ public static class RoleSeeder
 
             bool hasChanges = false;
 
-            foreach (var role in roles)
+            var systemRoleCodes = defaultRoles.Select(x => x.Code).ToHashSet(StringComparer.Ordinal);
+            foreach (var role in roles.Where(x => systemRoleCodes.Contains(x.Code)))
             {
                 rolePolicyLookup.TryGetValue(role.Id, out var rolePoliciesMap);
                 rolePoliciesMap ??= new Dictionary<Guid, RolePolicy>();
@@ -75,7 +76,8 @@ public static class RoleSeeder
                     {
                         isGranted = p.StartsWith("catalog.", StringComparison.Ordinal) || p.StartsWith("media.", StringComparison.Ordinal)
                             || p.StartsWith("orders.", StringComparison.Ordinal) || p.StartsWith("payments.", StringComparison.Ordinal)
-                            || p.StartsWith("shipments.", StringComparison.Ordinal);
+                            || p.StartsWith("shipments.", StringComparison.Ordinal) || p.StartsWith("producers.", StringComparison.Ordinal)
+                            || p.StartsWith("inventory.", StringComparison.Ordinal);
                     }
                     else if (role.Code == Roles.User)
                     {

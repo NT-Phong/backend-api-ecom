@@ -1,4 +1,5 @@
 using Ecom.Application.Features.Catalog.Common;
+using Ecom.Application.Features.Catalog.Queries.GetPublicCategories;
 using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Catalog.Queries.GetProductBySlug;
@@ -15,18 +16,12 @@ public sealed class GetProductBySlugQueryHandler(
         var products = unitOfWork.Repository<Product>().QueryNoTracking();
         var producers = unitOfWork.Repository<Producer>().QueryNoTracking();
         var mappings = unitOfWork.Repository<ProductCategory>().QueryNoTracking();
-        var categories = unitOfWork.Repository<Category>().QueryNoTracking();
 
         var product = await (
             from item in products
             join producer in producers on item.ProducerId equals producer.Id
-            join primary in mappings.Where(x => x.IsPrimary) on item.Id equals primary.ProductId
-            join category in categories on primary.CategoryId equals category.Id
             where item.Slug == slug
                   && item.Status == ProductStatus.Published
-                  && producer.PublicStatus == PublicStatus.Published
-                  && producer.IsVerified
-                  && category.Status == CatalogStatus.Published
             select new ProductRow(item.Id, item.Slug, item.Name, item.ShortDescription, item.Description,
                 item.UsageInstructions, item.StorageInstructions, item.WarningText, item.MetaTitle, item.MetaDescription,
                 item.PublishedAt, producer.Id, producer.Code, producer.Name, producer.Description, producer.WebsiteUrl))
@@ -35,13 +30,26 @@ public sealed class GetProductBySlugQueryHandler(
         if (product is null)
             return TResult<ProductDetailDto>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
 
-        var productCategories = await (
-            from mapping in mappings
-            join category in categories on mapping.CategoryId equals category.Id
-            where mapping.ProductId == product.Id && category.Status == CatalogStatus.Published
-            orderby mapping.IsPrimary descending, category.DisplayOrder, category.Name
-            select new CategorySummaryDto(category.Id, category.Name, category.Slug, mapping.IsPrimary, category.DisplayOrder))
+        var publicCategories = (await PublicCategoryVisibility.LoadAsync(unitOfWork, cancellationToken))
+            .Where(category => category.Status == CatalogStatus.Published)
+            .ToDictionary(category => category.Id);
+        var productCategories = await mappings
+            .Where(mapping => mapping.ProductId == product.Id)
+            .Select(mapping => new { mapping.CategoryId, mapping.IsPrimary })
             .ToListAsync(cancellationToken);
+        var responseCategories = productCategories
+            .Where(mapping => publicCategories.TryGetValue(mapping.CategoryId, out var category)
+                              && PublicCategoryVisibility.HasPublishedAncestors(category, publicCategories))
+            .Select(mapping =>
+            {
+                var category = publicCategories[mapping.CategoryId];
+                return new CategorySummaryDto(category.Id, category.Name, category.Slug, mapping.IsPrimary,
+                    category.DisplayOrder);
+            })
+            .OrderByDescending(category => category.IsPrimary)
+            .ThenBy(category => category.DisplayOrder)
+            .ThenBy(category => category.Name)
+            .ToList();
 
         var variants = await unitOfWork.Repository<ProductVariant>().QueryNoTracking()
             .Where(x => x.ProductId == product.Id && x.Status == VariantStatus.Active)
@@ -69,15 +77,13 @@ public sealed class GetProductBySlugQueryHandler(
             })
             .ToList();
 
-        if (responseVariants.Count == 0)
-            return TResult<ProductDetailDto>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
-
         return TResult<ProductDetailDto>.Success(new ProductDetailDto(product.Id, product.Slug, product.Name,
             product.ShortDescription, product.Description, product.UsageInstructions, product.StorageInstructions,
             product.WarningText, product.MetaTitle, product.MetaDescription,
             new ProducerSummaryDto(product.ProducerId, product.ProducerCode, product.ProducerName,
                 product.ProducerDescription, product.ProducerWebsiteUrl),
-            productCategories, media, responseVariants, product.PublishedAt ?? DateTime.MinValue));
+            responseCategories, media, responseVariants, responseVariants.Count > 0,
+            product.PublishedAt ?? DateTime.MinValue));
     }
 
     private sealed record ProductRow(Guid Id, string Slug, string Name, string? ShortDescription, string? Description,

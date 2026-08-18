@@ -51,7 +51,7 @@ public class OtpSettings
     /// <summary>
     /// Enables a temporary, server-to-server test OTP bypass outside Development.
     /// It is restricted to one configured phone number, requires a secret request header,
-    /// and stops working within 24 hours at <see cref="ControlledTestBypassExpiresAtUtc"/>.
+    /// and stops working within 72 hours at <see cref="ControlledTestBypassExpiresAtUtc"/>.
     /// </summary>
     public bool EnableControlledTestBypass { get; set; }
     public string ControlledTestPhoneNumber { get; set; } = string.Empty;

@@ -38,9 +38,9 @@ public sealed class OtpSettingsValidator(IHostEnvironment environment) : IValida
                 failures.Add("Otp:ControlledTestBypassKey must contain at least 32 characters when the controlled test bypass is enabled.");
             if (!options.ControlledTestBypassExpiresAtUtc.HasValue ||
                 options.ControlledTestBypassExpiresAtUtc <= DateTimeOffset.UtcNow ||
-                options.ControlledTestBypassExpiresAtUtc > DateTimeOffset.UtcNow.AddHours(24))
+                options.ControlledTestBypassExpiresAtUtc > DateTimeOffset.UtcNow.AddHours(72))
             {
-                failures.Add("Otp:ControlledTestBypassExpiresAtUtc must be a future UTC timestamp within 24 hours when the controlled test bypass is enabled.");
+                failures.Add("Otp:ControlledTestBypassExpiresAtUtc must be a future UTC timestamp within 72 hours when the controlled test bypass is enabled.");
             }
         }
 

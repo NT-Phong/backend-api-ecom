@@ -1,0 +1,7 @@
+using Ecom.Domain.Entities;
+
+namespace Ecom.Application.Features.Commerce.System.Commands.RevokeManagementSession;
+public sealed record RevokeManagementSessionCommand(Guid SessionId,string Reason):IRequest<TResult>,ITransactionalRequest;
+public sealed class RevokeManagementSessionCommandValidator:AbstractValidator<RevokeManagementSessionCommand>{public RevokeManagementSessionCommandValidator(){RuleFor(x=>x.SessionId).NotEmpty();RuleFor(x=>x.Reason).NotEmpty().MaximumLength(256);}}
+public sealed class RevokeManagementSessionCommandHandler(IUnitOfWork uow,ICurrentUser currentUser):IRequestHandler<RevokeManagementSessionCommand,TResult>
+{public async Task<TResult> Handle(RevokeManagementSessionCommand r,CancellationToken ct){if(!currentUser.IsAuthenticated)return TResult.Failure(MessageKey.Unauthorized,ErrorCodes.UNAUTHORIZED);if(!currentUser.HasPolicy(Permissions.SecuritySessions.Revoke))return TResult.Failure(MessageKey.Forbidden,ErrorCodes.FORBIDDEN);var session=await uow.Repository<UserSession>().FindByIdAsync(r.SessionId);if(session is null)return TResult.Failure(MessageKey.ResourceNotFound,ErrorCodes.NOT_FOUND);session.Revoke(DateTime.UtcNow,r.Reason);await uow.Repository<UserSession>().UpdateAsync(session,ct);var tokens=await uow.Repository<SessionRefreshToken>().FindAsync([x=>x.SessionId==session.Id&&x.RevokedAt==null]);foreach(var token in tokens){token.Revoke(DateTime.UtcNow);await uow.Repository<SessionRefreshToken>().UpdateAsync(token,ct);}return TResult.Success();}}

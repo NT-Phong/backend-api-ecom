@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -32,19 +33,227 @@ public sealed class CatalogApiAuthorizationTests(PostgreSqlFixture fixture)
     }
 
     [PostgreSqlFact]
-    public async Task Public_product_list_returns_only_a_product_with_published_catalog_facts_and_an_effective_price()
+    public async Task Public_product_list_and_detail_return_a_published_product_with_an_effective_price()
     {
         await fixture.ResetDatabaseAsync();
-        var slug = await SeedPublishedProductAsync();
+        var product = await SeedPublishedProductAsync();
         await using var factory = new CatalogApiFactory(fixture);
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/api/v1/products");
+        using var detail = await client.GetAsync($"/api/v1/products/{product.Slug}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var items = document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray();
+        var item = Assert.Single(items, item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+        Assert.True(item.GetProperty("hasEffectivePrice").GetBoolean());
+        Assert.Equal(123_000m, item.GetProperty("fromPrice").GetDecimal());
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_product_list_and_detail_keep_a_published_product_when_its_primary_media_is_no_longer_public()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using (var context = fixture.CreateDbContext())
+        {
+            var media = await context.MediaAssets.SingleAsync(x => x.Id == product.MediaAssetId);
+            media.ChangeVisibility(MediaVisibility.Internal);
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        using var list = await client.GetAsync("/api/v1/products");
+        using var detail = await client.GetAsync($"/api/v1/products/{product.Slug}");
+
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        using var document = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        var item = Assert.Single(document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(),
+            item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("primaryMedia").ValueKind);
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        using var detailDocument = JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+        Assert.Empty(detailDocument.RootElement.GetProperty("data").GetProperty("media").EnumerateArray());
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_product_list_and_detail_keep_a_published_product_when_a_primary_category_ancestor_is_not_published()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using (var context = fixture.CreateDbContext())
+        {
+            var category = await context.Categories.SingleAsync(x => x.Id == product.CategoryId);
+            var draftParent = Category.Create(null, "Draft Parent", $"draft-parent-{Guid.NewGuid():N}", null, 0);
+            category.UpdateDetails(draftParent.Id, category.Name, category.Slug, category.Description, category.DisplayOrder);
+            context.Categories.Add(draftParent);
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        using var list = await client.GetAsync("/api/v1/products");
+        using var detail = await client.GetAsync($"/api/v1/products/{product.Slug}");
+
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        using var document = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        var item = Assert.Single(document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(),
+            item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("primaryCategory").ValueKind);
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        using var detailDocument = JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+        Assert.Empty(detailDocument.RootElement.GetProperty("data").GetProperty("categories").EnumerateArray());
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_product_list_and_detail_keep_a_published_product_when_its_producer_becomes_unverified()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using (var context = fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "Tbl_Producer"
+                SET "PublicStatus" = {"Draft"}, "IsVerified" = {false}
+                WHERE "Id" = {product.ProducerId};
+                """);
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        using var list = await client.GetAsync("/api/v1/products");
+        using var detail = await client.GetAsync($"/api/v1/products/{product.Slug}");
+
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        using var document = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        Assert.Contains(document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(),
+            item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_product_list_and_detail_keep_a_published_product_when_it_has_no_effective_price()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using (var context = fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "Tbl_VariantPrice"
+                SET "EffectiveTo" = {DateTime.UtcNow.AddMinutes(-1)}
+                WHERE "ProductVariantId" IN (
+                    SELECT "Id" FROM "Tbl_ProductVariant" WHERE "ProductId" = {product.ProductId});
+                """);
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        using var list = await client.GetAsync("/api/v1/products");
+        using var detail = await client.GetAsync($"/api/v1/products/{product.Slug}");
+        using var pricedOnly = await client.GetAsync("/api/v1/products?minPrice=1");
+
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        using (var document = JsonDocument.Parse(await list.Content.ReadAsStringAsync()))
+        {
+            var item = Assert.Single(document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(),
+                item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+            Assert.False(item.GetProperty("hasEffectivePrice").GetBoolean());
+            Assert.Equal(JsonValueKind.Null, item.GetProperty("fromPrice").ValueKind);
+            Assert.Equal(JsonValueKind.Null, item.GetProperty("currencyCode").ValueKind);
+        }
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        using (var detailDocument = JsonDocument.Parse(await detail.Content.ReadAsStringAsync()))
+        {
+            var data = detailDocument.RootElement.GetProperty("data");
+            Assert.False(data.GetProperty("hasEffectivePrice").GetBoolean());
+            Assert.Empty(data.GetProperty("variants").EnumerateArray());
+        }
+        using var pricedDocument = JsonDocument.Parse(await pricedOnly.Content.ReadAsStringAsync());
+        Assert.DoesNotContain(pricedDocument.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(),
+            item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_product_price_sort_places_products_without_an_effective_price_last()
+    {
+        await fixture.ResetDatabaseAsync();
+        var pricedProduct = await SeedPublishedProductAsync();
+        var unpricedProduct = await SeedPublishedProductAsync();
+        await using (var context = fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "Tbl_VariantPrice"
+                SET "EffectiveTo" = {DateTime.UtcNow.AddMinutes(-1)}
+                WHERE "ProductVariantId" IN (
+                    SELECT "Id" FROM "Tbl_ProductVariant" WHERE "ProductId" = {unpricedProduct.ProductId});
+                """);
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/api/v1/products?sort=price-asc");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var items = document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray();
-        Assert.Contains(items, item => string.Equals(item.GetProperty("slug").GetString(), slug, StringComparison.Ordinal));
+        var slugs = document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("slug").GetString()).ToList();
+        Assert.True(slugs.IndexOf(pricedProduct.Slug) < slugs.IndexOf(unpricedProduct.Slug));
+    }
+
+    [PostgreSqlFact]
+    public async Task Updating_a_published_category_rejects_a_draft_parent()
+    {
+        await fixture.ResetDatabaseAsync();
+        var parent = Category.Create(null, "Draft Parent", $"draft-parent-{Guid.NewGuid():N}", null, 0);
+        var category = Category.Create(null, "Published Child", $"published-child-{Guid.NewGuid():N}", null, 0);
+        category.Publish();
+        await using (var context = fixture.CreateDbContext())
+        {
+            context.Categories.AddRange(parent, category);
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(Permissions.CatalogCategories.Update));
+
+        using var response = await client.PutAsJsonAsync($"/api/v1/catalog/categories/{category.Id}", new
+        {
+            concurrencyStamp = category.ConcurrencyStamp,
+            parentId = parent.Id,
+            category.Name,
+            category.Slug,
+            category.Description,
+            category.DisplayOrder
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_product_price_filters_use_the_display_from_price()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+
+        using var matching = await client.GetAsync("/api/v1/products?maxPrice=123000");
+        using var excluded = await client.GetAsync("/api/v1/products?minPrice=123001");
+
+        using (var document = JsonDocument.Parse(await matching.Content.ReadAsStringAsync()))
+        {
+            Assert.Contains(document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(),
+                item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+        }
+        using (var document = JsonDocument.Parse(await excluded.Content.ReadAsStringAsync()))
+        {
+            Assert.DoesNotContain(document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(),
+                item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
+        }
     }
 
     [PostgreSqlFact]
@@ -213,7 +422,7 @@ public sealed class CatalogApiAuthorizationTests(PostgreSqlFixture fixture)
         Assert.True(document.RootElement.TryGetProperty("data", out _));
     }
 
-    private async Task<string> SeedPublishedProductAsync()
+    private async Task<PublicProductSeed> SeedPublishedProductAsync()
     {
         var producerId = Guid.NewGuid();
         var now = DateTime.UtcNow;
@@ -234,14 +443,20 @@ public sealed class CatalogApiAuthorizationTests(PostgreSqlFixture fixture)
         product.Publish(now, hasPrimaryCategory: true, hasPrimaryMedia: true, hasActiveVariant: true, hasEffectivePrice: true);
         var variant = ProductVariant.Create(product.Id, $"PUBLIC-SKU-{Guid.NewGuid():N}", "Default", InventoryMode.NotTracked);
         var price = VariantPrice.Create(variant.Id, 123_000m, PriceType.Public, now.AddMinutes(-1), now.AddDays(1));
+        var media = MediaAsset.CreatePending($"uploads/quarantine/{Guid.NewGuid():N}.jpg", "product.jpg", "image/jpeg", 128,
+            MediaType.Image, MediaVisibility.Public);
+        media.MarkClean($"uploads/public/{Guid.NewGuid():N}.jpg", MediaVisibility.Public, now);
+        var productMedia = product.AttachMedia([], media.Id, 0, makePrimary: true, mediaIsPubliclyUsable: true);
 
         context.Categories.Add(category);
         context.Products.Add(product);
         context.ProductCategories.Add(productCategory);
         context.ProductVariants.Add(variant);
         context.VariantPrices.Add(price);
+        context.MediaAssets.Add(media);
+        context.ProductMedia.Add(productMedia);
         await context.SaveChangesAsync();
-        return slug;
+        return new PublicProductSeed(product.Id, producerId, category.Id, media.Id, slug);
     }
 
     private async Task<string> SeedCategoryWithPausedAncestorAsync()
@@ -258,4 +473,6 @@ public sealed class CatalogApiAuthorizationTests(PostgreSqlFixture fixture)
         await context.SaveChangesAsync();
         return childSlug;
     }
+
+    private sealed record PublicProductSeed(Guid ProductId, Guid ProducerId, Guid CategoryId, Guid MediaAssetId, string Slug);
 }

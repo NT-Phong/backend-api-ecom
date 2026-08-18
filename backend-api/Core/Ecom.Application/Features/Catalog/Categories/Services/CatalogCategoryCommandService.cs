@@ -26,6 +26,11 @@ public sealed class CatalogCategoryCommandService(IUnitOfWork unitOfWork, ICatal
         var entity = category.Category!;
         var parent = await ValidateParentAsync(request.ParentId, entity.Id, cancellationToken);
         if (parent is not null) return Failure(parent);
+        if (await HasPublishedDependentsAsync(entity.Id, cancellationToken))
+        {
+            var ancestors = await ValidatePublishedParentChainAsync(request.ParentId, cancellationToken);
+            if (ancestors is not null) return Failure(ancestors);
+        }
         if (await unitOfWork.Repository<Category>().AnyAsync([x => x.Id != entity.Id && x.Slug == request.Slug.Trim()]))
             return TResult<CatalogCategoryManagementDto>.Failure("Category slug already exists.", ErrorCodes.ALREADY_EXISTS);
 
@@ -116,9 +121,11 @@ public sealed class CatalogCategoryCommandService(IUnitOfWork unitOfWork, ICatal
     }
 
     private async Task<TResult?> ValidatePublishedAncestorsAsync(Category category, CancellationToken cancellationToken)
+        => await ValidatePublishedParentChainAsync(category.ParentId, cancellationToken);
+
+    private async Task<TResult?> ValidatePublishedParentChainAsync(Guid? parentId, CancellationToken cancellationToken)
     {
         var visited = new HashSet<Guid>();
-        var parentId = category.ParentId;
         while (parentId.HasValue)
         {
             if (!visited.Add(parentId.Value))
@@ -130,6 +137,24 @@ public sealed class CatalogCategoryCommandService(IUnitOfWork unitOfWork, ICatal
             parentId = parent.ParentId;
         }
         return null;
+    }
+
+    private async Task<bool> HasPublishedDependentsAsync(Guid categoryId, CancellationToken cancellationToken)
+    {
+        var categories = await unitOfWork.Repository<Category>().QueryNoTracking()
+            .Select(x => new { x.Id, x.ParentId, x.Status }).ToListAsync(cancellationToken);
+        var parentById = categories.ToDictionary(x => x.Id, x => x.ParentId);
+        var hasPublishedCategory = categories.Any(x => x.Status == CatalogStatus.Published
+            && (x.Id == categoryId || IsDescendantOf(x.Id, categoryId, parentById)));
+        if (hasPublishedCategory) return true;
+
+        var publishedPrimaryCategoryIds = await (
+            from mapping in unitOfWork.Repository<ProductCategory>().QueryNoTracking()
+            join product in unitOfWork.Repository<Product>().QueryNoTracking() on mapping.ProductId equals product.Id
+            where mapping.IsPrimary && product.Status == ProductStatus.Published
+            select mapping.CategoryId).ToListAsync(cancellationToken);
+
+        return publishedPrimaryCategoryIds.Any(id => id == categoryId || IsDescendantOf(id, categoryId, parentById));
     }
 
     private async Task<TResult?> ValidateNoPublishedDependentsAsync(Category category, CancellationToken cancellationToken)

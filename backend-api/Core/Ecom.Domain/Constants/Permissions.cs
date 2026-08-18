@@ -78,6 +78,44 @@ public static class Permissions
         public const string Manage = "shipments.manage";
     }
 
+    public static class Producers
+    {
+        public const string Read = "producers.read";
+        public const string Create = "producers.create";
+        public const string Update = "producers.update";
+        public const string Publish = "producers.publish";
+        public const string Verify = "producers.verify";
+    }
+
+    public static class Inventory
+    {
+        public const string Read = "inventory.read";
+        public const string Adjust = "inventory.adjust";
+        public const string LocationsManage = "inventory.locations.manage";
+    }
+
+    public static class Settings
+    {
+        public const string Read = "settings.read";
+        public const string Update = "settings.update";
+    }
+
+    public static class Audit
+    {
+        public const string Read = "audit.read";
+    }
+
+    public static class SecuritySessions
+    {
+        public const string Read = "security.sessions.read";
+        public const string Revoke = "security.sessions.revoke";
+    }
+
+    public static class SecurityEvents
+    {
+        public const string Read = "security.events.read";
+    }
+
     #endregion
 
     #region Roles Module
@@ -148,6 +186,20 @@ public static class Permissions
             ,new(Payments.Verify, "Xác minh thanh toán", "Payments")
             ,new(Payments.Refund, "Hoàn tiền thanh toán", "Payments")
             ,new(Shipments.Manage, "Quản lý giao hàng", "Shipments")
+            ,new(Producers.Read, "Xem nhà sản xuất", "Producers")
+            ,new(Producers.Create, "Tạo nhà sản xuất", "Producers")
+            ,new(Producers.Update, "Cập nhật nhà sản xuất", "Producers")
+            ,new(Producers.Publish, "Xuất bản nhà sản xuất", "Producers")
+            ,new(Producers.Verify, "Xác minh nhà sản xuất", "Producers")
+            ,new(Inventory.Read, "Xem tồn kho", "Inventory")
+            ,new(Inventory.Adjust, "Điều chỉnh tồn kho", "Inventory")
+            ,new(Inventory.LocationsManage, "Quản lý vị trí kho", "Inventory")
+            ,new(Settings.Read, "Xem cài đặt hệ thống", "Settings")
+            ,new(Settings.Update, "Cập nhật cài đặt hệ thống", "Settings")
+            ,new(Audit.Read, "Xem nhật ký kiểm toán", "Audit")
+            ,new(SecuritySessions.Read, "Xem phiên bảo mật", "Security")
+            ,new(SecuritySessions.Revoke, "Thu hồi phiên bảo mật", "Security")
+            ,new(SecurityEvents.Read, "Xem sự kiện bảo mật", "Security")
             ,new(CatalogCategories.Read, "Xem quản trị danh mục", "CatalogCategories")
             ,new(CatalogCategories.Create, "Tạo danh mục", "CatalogCategories")
             ,new(CatalogCategories.Update, "Cập nhật danh mục", "CatalogCategories")

@@ -46,7 +46,9 @@ public sealed class PublicCatalogReadStore(
             {
                 totalCount = reader.GetInt32(0);
                 var productId = reader.GetGuid(1);
+                var primaryCategory = CreatePrimaryCategory(reader);
                 var primaryMedia = CreatePrimaryMedia(reader, productId);
+                var hasEffectivePrice = !reader.IsDBNull(15);
                 items.Add(new ProductListItemDto(
                     productId,
                     reader.GetString(2),
@@ -58,10 +60,11 @@ public sealed class PublicCatalogReadStore(
                         reader.GetString(8),
                         reader.IsDBNull(9) ? null : reader.GetString(9),
                         reader.IsDBNull(10) ? null : reader.GetString(10)),
-                    new CategorySummaryDto(reader.GetGuid(11), reader.GetString(12), reader.GetString(13), true, reader.GetInt32(14)),
+                    primaryCategory,
                     primaryMedia,
-                    reader.GetDecimal(15),
-                    reader.GetString(16),
+                    hasEffectivePrice ? reader.GetDecimal(15) : null,
+                    hasEffectivePrice ? reader.GetString(16) : null,
+                    hasEffectivePrice,
                     reader.GetFieldValue<DateTime>(5)));
             }
 
@@ -72,6 +75,15 @@ public sealed class PublicCatalogReadStore(
             if (closeConnection)
                 await connection.CloseAsync();
         }
+    }
+
+    private static CategorySummaryDto? CreatePrimaryCategory(IDataRecord row)
+    {
+        if (row.IsDBNull(11))
+            return null;
+
+        return new CategorySummaryDto(row.GetGuid(11), row.GetString(12), row.GetString(13), true,
+            row.GetInt32(14));
     }
 
     private ProductMediaDto? CreatePrimaryMedia(IDataRecord row, Guid productId)
@@ -115,20 +127,13 @@ public sealed class PublicCatalogReadStore(
         var orderBy = sort switch
         {
             ProductSort.NameAscending => "\"Name\" ASC, \"Id\" ASC",
-            ProductSort.PriceAscending => "\"FromPrice\" ASC, \"Id\" ASC",
-            ProductSort.PriceDescending => "\"FromPrice\" DESC, \"Id\" ASC",
+            ProductSort.PriceAscending => "\"FromPrice\" ASC NULLS LAST, \"Id\" ASC",
+            ProductSort.PriceDescending => "\"FromPrice\" DESC NULLS LAST, \"Id\" ASC",
             _ => "\"PublishedAt\" DESC NULLS LAST, \"Id\" ASC"
         };
 
-        return $$"""
-            WITH RECURSIVE "CategoryAncestors" AS (
-                SELECT c."Id" AS "CategoryId", c."Id" AS "AncestorId", c."ParentId", c."Status", c."IsDeleted"
-                FROM "Tbl_Category" AS c
-                UNION ALL
-                SELECT ancestors."CategoryId", parent."Id", parent."ParentId", parent."Status", parent."IsDeleted"
-                FROM "CategoryAncestors" AS ancestors
-                INNER JOIN "Tbl_Category" AS parent ON parent."Id" = ancestors."ParentId"
-            ),
+        return CategoryAncestorsCte + $$"""
+            ,
             "EffectiveVariantPrices" AS (
                 SELECT
                     variant."ProductId",
@@ -195,14 +200,20 @@ public sealed class PublicCatalogReadStore(
                 INNER JOIN "Tbl_Producer" AS producer
                     ON producer."Id" = product."ProducerId"
                     AND producer."IsDeleted" = FALSE
-                INNER JOIN "Tbl_ProductCategory" AS productCategory
+                LEFT JOIN "Tbl_ProductCategory" AS productCategory
                     ON productCategory."ProductId" = product."Id"
                     AND productCategory."IsDeleted" = FALSE
                     AND productCategory."IsPrimary" = TRUE
-                INNER JOIN "Tbl_Category" AS category
+                LEFT JOIN "Tbl_Category" AS category
                     ON category."Id" = productCategory."CategoryId"
                     AND category."IsDeleted" = FALSE
-                INNER JOIN "ProductPrices" AS prices ON prices."ProductId" = product."Id"
+                    AND category."Status" = 'Published'
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM "CategoryAncestors" AS ancestors
+                        WHERE ancestors."CategoryId" = category."Id"
+                            AND (ancestors."IsDeleted" = TRUE OR ancestors."Status" <> 'Published'))
+                LEFT JOIN "ProductPrices" AS prices ON prices."ProductId" = product."Id"
                 LEFT JOIN LATERAL (
                     SELECT
                         productMedia."MediaAssetId",
@@ -225,13 +236,6 @@ public sealed class PublicCatalogReadStore(
                 ) AS media ON TRUE
                 WHERE product."IsDeleted" = FALSE
                     AND product."Status" = 'Published'
-                    AND producer."PublicStatus" = 'Published'
-                    AND producer."IsVerified" = TRUE
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM "CategoryAncestors" AS ancestors
-                        WHERE ancestors."CategoryId" = category."Id"
-                            AND (ancestors."IsDeleted" = TRUE OR ancestors."Status" <> 'Published'))
                     AND (@search IS NULL OR product."Name" ILIKE '%' || @search || '%'
                         OR COALESCE(product."ShortDescription", '') ILIKE '%' || @search || '%')
                     AND (@producerId IS NULL OR producer."Id" = @producerId)
@@ -243,6 +247,7 @@ public sealed class PublicCatalogReadStore(
                         INNER JOIN "Tbl_Category" AS filteredCategory
                             ON filteredCategory."Id" = categoryFilter."CategoryId"
                             AND filteredCategory."IsDeleted" = FALSE
+                            AND filteredCategory."Status" = 'Published'
                         WHERE categoryFilter."ProductId" = product."Id"
                             AND categoryFilter."IsDeleted" = FALSE
                             AND filteredCategory."Slug" = @categorySlug
@@ -264,4 +269,15 @@ public sealed class PublicCatalogReadStore(
             LIMIT @pageSize OFFSET @offset;
             """;
     }
+
+    private const string CategoryAncestorsCte = """
+        WITH RECURSIVE "CategoryAncestors" AS (
+            SELECT c."Id" AS "CategoryId", c."Id" AS "AncestorId", c."ParentId", c."Status", c."IsDeleted"
+            FROM "Tbl_Category" AS c
+            UNION ALL
+            SELECT ancestors."CategoryId", parent."Id", parent."ParentId", parent."Status", parent."IsDeleted"
+            FROM "CategoryAncestors" AS ancestors
+            INNER JOIN "Tbl_Category" AS parent ON parent."Id" = ancestors."ParentId"
+        )
+        """;
 }

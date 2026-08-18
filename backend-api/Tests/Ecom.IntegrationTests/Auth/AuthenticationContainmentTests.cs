@@ -120,6 +120,41 @@ public sealed class AuthenticationContainmentTests
     }
 
     [Fact]
+    public void Controlled_test_bypass_allows_an_expiration_within_72_hours()
+    {
+        var validator = new OtpSettingsValidator(new TestHostEnvironment(Environments.Production));
+        var result = validator.Validate(null, new OtpSettings
+        {
+            HashKey = OtpHashKey,
+            EnableControlledTestBypass = true,
+            ControlledTestPhoneNumber = TestAccounts.Admin,
+            ControlledTestOtp = "0000",
+            ControlledTestBypassKey = "integration-test-controlled-bypass-key-32-characters",
+            ControlledTestBypassExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(71).AddMinutes(59)
+        });
+
+        Assert.False(result.Failed);
+    }
+
+    [Fact]
+    public void Controlled_test_bypass_rejects_an_expiration_beyond_72_hours()
+    {
+        var validator = new OtpSettingsValidator(new TestHostEnvironment(Environments.Production));
+        var result = validator.Validate(null, new OtpSettings
+        {
+            HashKey = OtpHashKey,
+            EnableControlledTestBypass = true,
+            ControlledTestPhoneNumber = TestAccounts.Admin,
+            ControlledTestOtp = "0000",
+            ControlledTestBypassKey = "integration-test-controlled-bypass-key-32-characters",
+            ControlledTestBypassExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(72).AddMinutes(1)
+        });
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, failure => failure.Contains("ExpiresAtUtc", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Missing_sms_provider_is_explicitly_fail_closed()
     {
         var sender = new SmsSender();

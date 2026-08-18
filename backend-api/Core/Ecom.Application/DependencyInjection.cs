@@ -31,6 +31,8 @@ public static class DependencyInjection
         services.AddScoped<Features.Catalog.Products.Services.ICatalogProductMutationService,
             Features.Catalog.Products.Services.CatalogProductMutationService>();
         services.AddScoped<Features.Catalog.Categories.CatalogCategoryCommandService>();
+
+        services.AddScoped<Features.Commerce.Producers.ProducerManagementService>();
 		services.AddScoped<IAuthenticationSessionEngine, Common.Services.AuthenticationSessionEngine>();
         services.AddScoped<IUserAuthorizationSnapshotService, Common.Services.UserAuthorizationSnapshotService>();
 

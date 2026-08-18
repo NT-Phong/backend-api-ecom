@@ -93,8 +93,9 @@ Sau một mutation thành công, dùng `data.concurrencyStamp` mới cho mutatio
 ```ts
 type ProductListItem = {
   id: string; slug: string; name: string; shortDescription: string | null;
-  producer: ProducerSummary; primaryCategory: CategorySummary;
-  primaryMedia: ProductMedia | null; fromPrice: number; currencyCode: string;
+  producer: ProducerSummary; primaryCategory: CategorySummary | null;
+  primaryMedia: ProductMedia | null; fromPrice: number | null; currencyCode: string | null;
+  hasEffectivePrice: boolean;
   publishedAt: string;
 };
 type ProductDetail = {
@@ -103,7 +104,7 @@ type ProductDetail = {
   storageInstructions: string | null; warningText: string | null;
   metaTitle: string | null; metaDescription: string | null;
   producer: ProducerSummary; categories: CategorySummary[]; media: ProductMedia[];
-  variants: ProductVariant[]; publishedAt: string;
+  variants: ProductVariant[]; hasEffectivePrice: boolean; publishedAt: string;
 };
 type ProducerSummary = { id: string; code: string; name: string; description: string | null; websiteUrl: string | null };
 type CategorySummary = { id: string; name: string; slug: string; isPrimary: boolean; displayOrder: number };
@@ -115,7 +116,7 @@ type ProductVariant = {
 };
 ```
 
-Public listing/detail chỉ trả product/producer/category hợp lệ cho public và giá hiệu lực. FE phải render `fromPrice`/`variants[].price` từ server, không suy ra giá từ price period management.
+Public listing/detail trả Product đang `Published` (và chưa bị soft-delete). Ảnh chỉ xuất hiện khi MediaAsset là `Clean + Public`; nếu không có ảnh an toàn, `primaryMedia` là `null` và `media` có thể rỗng. Category không public được trả là `null`/không nằm trong `categories`, nhưng không làm product biến mất. Giá hiệu lực là optional: khi `hasEffectivePrice=false`, `fromPrice`/`currencyCode` là `null` và `variants` có thể rỗng. FE hiển thị placeholder hoặc “Liên hệ”; checkout vẫn phải lấy giá/stock do server xác minh, không suy ra giá từ price period management.
 
 ### 3.2 Category public
 

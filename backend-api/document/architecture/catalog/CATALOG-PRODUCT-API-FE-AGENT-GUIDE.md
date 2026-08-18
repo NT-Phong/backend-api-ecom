@@ -82,11 +82,12 @@ GET /api/v1/products?q=mat%20ong&categorySlug=dac-san&minPrice=100000&sort=price
   "primaryMedia": { "mediaAssetId": "uuid", "url": "https://...", "contentType": "image/webp", "altText": null, "caption": null, "displayOrder": 0, "isPrimary": true },
   "fromPrice": 120000,
   "currencyCode": "VND",
+  "hasEffectivePrice": true,
   "publishedAt": "2026-07-26T10:00:00Z"
 }
 ```
 
-`primaryMedia` can be `null`; use an FE placeholder. `fromPrice` is display-only, never a checkout quote.
+Published products remain browsable when presentation facts are unavailable. `primaryMedia` and `primaryCategory` can be `null`; use an FE placeholder and omit the category link. `fromPrice`/`currencyCode` can be `null` when `hasEffectivePrice` is `false`; render a contact/unavailable-price state. `fromPrice` is display-only, never a checkout quote.
 
 ### `GET /products/{slug}`
 
@@ -96,7 +97,7 @@ Purpose: canonical public detail/SEO page. Use the slug from the list or browser
 GET /api/v1/products/mat-ong-rung
 ```
 
-`data` contains Product content/SEO, Producer, all public categories, clean/public gallery media, and only active variants with an effective price. Each variant contains `id`, `sku`, `name`, `price`, `currencyCode`, `priceType`, `weightGrams`, and selected option values.
+`data` contains Product content/SEO, Producer, public categories, clean/public gallery media, and active variants with an effective price. Missing public category/media/price facts do not turn a Published product into `404`: categories/media/variants can be empty and `hasEffectivePrice` is `false`. Each returned variant contains `id`, `sku`, `name`, `price`, `currencyCode`, `priceType`, `weightGrams`, and selected option values.
 
 ### `GET /categories`
 
