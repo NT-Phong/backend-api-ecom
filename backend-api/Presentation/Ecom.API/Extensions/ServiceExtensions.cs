@@ -14,7 +14,7 @@ public static class ServiceExtensions
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration,
         IHostEnvironment environment)
     {
-        services.AddControllers(options =>
+        services.AddControllersWithViews(options =>
         {
             options.Filters.Add<ModelValidationFilter>();
         })

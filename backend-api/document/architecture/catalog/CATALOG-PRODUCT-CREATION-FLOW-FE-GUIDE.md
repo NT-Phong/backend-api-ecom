@@ -309,7 +309,7 @@ POST /api/v1/catalog/products/{productId}/variants
 
 Response có `variantId`, `productId`, `concurrencyStamp`. SKU là unique trong source hiện tại và **immutable**: `PUT /variants/{variantId}` không có field `sku`. `weightGrams`, nếu gửi, phải lớn hơn 0; `displayOrder >= 0`.
 
-`inventoryMode` hiện hỗ trợ `NotTracked`, `Tracked`, `Preorder`. Việc tạo/sửa Variant không tự tạo inventory balance; module quản trị kho là phạm vi riêng.
+`inventoryMode` hiện hỗ trợ `NotTracked`, `Tracked`, `Preorder`. Việc tạo/sửa Variant không tự tạo inventory balance. Với Variant `Tracked`, FE tiếp tục qua module quản trị kho theo [Product, Variant & Inventory V1 — FE Agent Guide](../../api/PRODUCT-INVENTORY-V1-FE-AGENT-GUIDE.md): khởi tạo level ở `0`, rồi tạo adjustment dương để nhập tồn ban đầu.
 
 ### 2.7 Bước 5 — thêm giá tiền cho variant
 
@@ -483,7 +483,7 @@ FE nên render “Publish readiness” từ product detail và lookup, nhưng đ
 | Media Library list/search/reuse toàn hệ thống | Không có list/library API. | Upload mới hoặc dùng asset ID trong product detail; đề xuất backend API trước khi xây library. |
 | Chỉnh/sửa/xóa một VariantPrice đã tạo | Price API append-only. | Tạo period mới hợp lệ; không viết PATCH/DELETE giả định. |
 | PriceList management | Entity tồn tại nhưng Catalog V1 chưa có management API. | Chỉ gửi `priceListId` khi system đã cung cấp ID hợp lệ. |
-| Tồn kho thực tế/stock quantity | Product/Variant create chỉ nhận inventory policy. | Không hiển thị/sửa stock trong editor Catalog; dùng module Inventory khi contract có. |
+| Tồn kho thực tế/stock quantity | Product/Variant create chỉ nhận inventory policy; Inventory V1 đã có module riêng. | Không gửi quantity trong Catalog editor; mở module Inventory theo [guide chuyên biệt](../../api/PRODUCT-INVENTORY-V1-FE-AGENT-GUIDE.md) để khởi tạo level và tạo adjustment có lý do. |
 | Preview public giống storefront ngay sau Publish | Public behavior/API runtime chưa là proof trong guide này. | Gọi public `GET /products/{slug}` ở môi trường được phê duyệt để smoke test; không dùng management DTO. |
 | Hard delete/restore Product | `DELETE /catalog/products/{id}` là alias Discontinue. | Cảnh báo terminal, không gọi là delete vật lý. |
 | Đổi Producer của Product | Update command không có `producerId`. | Quyết định producer trước create; nếu cần đổi, mở yêu cầu backend/use case có audit. |
