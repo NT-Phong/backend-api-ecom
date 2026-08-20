@@ -10,7 +10,7 @@ public sealed class GetManagementOrderByIdQueryHandler(IUnitOfWork unitOfWork, I
     public async Task<TResult<ManagementOrderDetailDto>> Handle(GetManagementOrderByIdQuery request, CancellationToken ct)
     {
         if (!currentUser.IsAuthenticated) return TResult<ManagementOrderDetailDto>.Failure(MessageKey.Unauthorized, ErrorCodes.UNAUTHORIZED);
-        if (!currentUser.HasPolicy(Permissions.Orders.Manage)) return TResult<ManagementOrderDetailDto>.Failure(MessageKey.Forbidden, ErrorCodes.FORBIDDEN);
+        if (!currentUser.HasPolicy(Permissions.Orders.Read)) return TResult<ManagementOrderDetailDto>.Failure(MessageKey.Forbidden, ErrorCodes.FORBIDDEN);
         var order = await unitOfWork.Repository<Order>().QueryNoTracking().FirstOrDefaultAsync(x => x.Id == request.OrderId, ct);
         if (order is null) return TResult<ManagementOrderDetailDto>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
         var payment = await unitOfWork.Repository<Payment>().QueryNoTracking().FirstOrDefaultAsync(x => x.OrderId == order.Id, ct);

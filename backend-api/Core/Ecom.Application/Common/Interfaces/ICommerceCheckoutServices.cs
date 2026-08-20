@@ -18,6 +18,15 @@ public interface ICheckoutPricingService
         CheckoutRecipient recipient, PaymentMethod paymentMethod, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Owns cart row locking for the order-creation transaction.
+/// </summary>
+public interface ICheckoutCartStore
+{
+    Task<LockedCheckoutCart?> LockActiveCartAsync(CartPrincipal principal, DateTime now,
+        CancellationToken cancellationToken);
+}
+
 public interface IInventoryReservationStore
 {
     Task<TResult<IReadOnlyDictionary<Guid, LockedInventory>>> LockTrackedInventoryAsync(

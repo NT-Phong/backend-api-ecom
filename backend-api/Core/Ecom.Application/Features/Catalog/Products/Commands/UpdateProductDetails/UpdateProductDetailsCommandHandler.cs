@@ -17,7 +17,8 @@ public sealed class UpdateProductDetailsCommandHandler(IUnitOfWork unitOfWork, I
 
         product.ReturnToReviewIfPublished(DateTime.UtcNow);
         product.UpdateDetails(request.Name, request.Slug, request.ShortDescription, request.Description,
-            request.UsageInstructions, request.StorageInstructions, request.WarningText, request.MetaTitle, request.MetaDescription);
+            request.UsageInstructions, request.StorageInstructions, request.WarningText, request.MetaTitle, request.MetaDescription,
+            request.BrandName);
         var result = CatalogCommandSupport.RenewVersion(product);
         await unitOfWork.Repository<Product>().UpdateAsync(product, cancellationToken);
         return TResult<ProductManagementResult>.Success(result);

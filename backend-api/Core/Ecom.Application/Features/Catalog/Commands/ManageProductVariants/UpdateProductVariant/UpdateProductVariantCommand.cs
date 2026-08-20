@@ -47,6 +47,11 @@ public sealed class UpdateProductVariantCommandHandler(
         var variant = await unitOfWork.Repository<ProductVariant>().FindByIdAsync(request.VariantId);
         if (variant is null || variant.ProductId != request.ProductId)
             return TResult<ProductManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
+        if (variant.InventoryMode != request.InventoryMode &&
+            await unitOfWork.Repository<InventoryItem>().AnyAsync([x => x.ProductVariantId == variant.Id]))
+            return TResult<ProductManagementResult>.Failure(
+                "Inventory mode cannot change after inventory tracking has been initialized.",
+                ErrorCodes.UNPROCESSABLE_ENTITY);
 
         product.ReturnToReviewIfPublished(DateTime.UtcNow);
         variant.UpdateDetails(request.Name, request.Barcode, request.WeightGrams, request.DisplayOrder);

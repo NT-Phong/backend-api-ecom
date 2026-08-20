@@ -299,13 +299,19 @@ public sealed class CatalogApiAuthorizationTests(PostgreSqlFixture fixture)
     }
 
     [PostgreSqlFact]
-    public async Task Backoffice_catalog_endpoint_allows_the_required_permission_and_preserves_the_success_envelope()
+    public async Task Backoffice_catalog_endpoint_requires_inventory_read_and_preserves_the_success_envelope()
     {
         await fixture.ResetDatabaseAsync();
         await using var factory = new CatalogApiFactory(fixture);
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(Permissions.CatalogProducts.Read));
 
+        using var forbidden = await client.GetAsync("/api/v1/catalog/products");
+
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(
+            Permissions.CatalogProducts.Read, Permissions.Inventory.Read));
         using var response = await client.GetAsync("/api/v1/catalog/products");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

@@ -81,11 +81,17 @@ public sealed class EffectivePriceResolver(IUnitOfWork unitOfWork) : IEffectiveP
                 price.PriceType, price.EffectiveFrom);
     }
 
-    public IQueryable<EffectiveProductPrice> QueryEffectiveProductPrices(DateTime asOfUtc)
+    public IQueryable<EffectiveProductPrice> QueryEffectiveProductPrices(DateTime asOfUtc,
+        IReadOnlyCollection<Guid>? productIds = null)
     {
         var activeVariants = unitOfWork.Repository<ProductVariant>().QueryNoTracking()
-            .Where(x => x.Status == VariantStatus.Active)
-            .Select(x => new { x.Id, x.ProductId });
+            .Where(x => x.Status == VariantStatus.Active);
+        if (productIds is not null)
+        {
+            var ids = productIds.Distinct().ToArray();
+            activeVariants = activeVariants.Where(x => ids.Contains(x.ProductId));
+        }
+        var activeVariantRows = activeVariants.Select(x => new { x.Id, x.ProductId });
 
         var prices = unitOfWork.Repository<VariantPrice>().QueryNoTracking();
         var priceLists = unitOfWork.Repository<PriceList>().QueryNoTracking();
@@ -124,11 +130,53 @@ public sealed class EffectivePriceResolver(IUnitOfWork unitOfWork) : IEffectiveP
                 other.ProductVariantId == candidate.ProductVariantId &&
                 ((other.PriceType == PriceType.Sale && candidate.PriceType == PriceType.Public) ||
                  (other.PriceType == candidate.PriceType && other.EffectiveFrom > candidate.EffectiveFrom)))
-            join variant in activeVariants on candidate.ProductVariantId equals variant.Id
+            join variant in activeVariantRows on candidate.ProductVariantId equals variant.Id
             select new { variant.ProductId, candidate.Amount };
 
         return from price in effectiveVariantPrices
                group price.Amount by price.ProductId into productPrices
                select new EffectiveProductPrice(productPrices.Key, productPrices.Min(), CommerceConstants.DefaultCurrency);
+    }
+
+    public IQueryable<Guid> QueryProductIdsWithEffectivePrice(DateTime asOfUtc, decimal? minimumAmount = null,
+        decimal? maximumAmount = null)
+    {
+        var activeVariants = unitOfWork.Repository<ProductVariant>().QueryNoTracking()
+            .Where(x => x.Status == VariantStatus.Active)
+            .Select(x => new { x.Id, x.ProductId });
+        var prices = unitOfWork.Repository<VariantPrice>().QueryNoTracking();
+        var priceLists = unitOfWork.Repository<PriceList>().QueryNoTracking();
+        var candidates =
+            from price in prices
+            join priceList in priceLists on price.PriceListId equals priceList.Id into priceListGroup
+            from priceList in priceListGroup.DefaultIfEmpty()
+            where price.CurrencyCode == CommerceConstants.DefaultCurrency
+                  && price.MinQuantity == 1
+                  && (price.PriceType == PriceType.Sale || price.PriceType == PriceType.Public)
+                  && price.EffectiveFrom <= asOfUtc
+                  && (price.EffectiveTo == null || price.EffectiveTo > asOfUtc)
+                  && (price.PriceListId == null ||
+                      (priceList != null && priceList.Status == PriceListStatus.Active
+                       && (priceList.StartsAt == null || priceList.StartsAt <= asOfUtc)
+                       && (priceList.EndsAt == null || priceList.EndsAt > asOfUtc)))
+            select new { price.ProductVariantId, price.Amount, price.PriceType, price.EffectiveFrom };
+        var effectiveVariantPrices =
+            from candidate in candidates
+            where !candidates.Any(other =>
+                other.ProductVariantId == candidate.ProductVariantId &&
+                ((other.PriceType == PriceType.Sale && candidate.PriceType == PriceType.Public) ||
+                 (other.PriceType == candidate.PriceType && other.EffectiveFrom > candidate.EffectiveFrom)))
+            join variant in activeVariants on candidate.ProductVariantId equals variant.Id
+            select new { variant.ProductId, candidate.Amount };
+        var productPrices =
+            from price in effectiveVariantPrices
+            group price.Amount by price.ProductId into amounts
+            select new { ProductId = amounts.Key, Amount = amounts.Min() };
+
+        if (minimumAmount.HasValue)
+            productPrices = productPrices.Where(x => x.Amount >= minimumAmount.Value);
+        if (maximumAmount.HasValue)
+            productPrices = productPrices.Where(x => x.Amount <= maximumAmount.Value);
+        return productPrices.Select(x => x.ProductId);
     }
 }

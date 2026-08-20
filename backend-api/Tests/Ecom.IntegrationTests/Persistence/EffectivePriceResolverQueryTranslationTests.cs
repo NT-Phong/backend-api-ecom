@@ -12,21 +12,32 @@ namespace Ecom.IntegrationTests.Persistence;
 public sealed class EffectivePriceResolverQueryTranslationTests
 {
     [Fact]
-    public void Effective_product_price_query_can_be_composed_as_a_catalog_exists_filter()
+    public void Effective_product_id_query_can_be_composed_as_a_catalog_exists_filter()
     {
         using var context = CreateContext();
         var unitOfWork = new UnitOfWork(context, NullLogger<UnitOfWork>.Instance);
         var resolver = new EffectivePriceResolver(unitOfWork);
-        var effectivePrices = resolver.QueryEffectiveProductPrices(DateTime.UtcNow);
+        var effectiveProductIds = resolver.QueryProductIdsWithEffectivePrice(DateTime.UtcNow, 1m);
 
         var catalogQuery = unitOfWork.Repository<Product>().QueryNoTracking()
-            .Where(product => effectivePrices.Any(price =>
-                price.ProductId == product.Id && price.Amount >= 1m));
+            .Where(product => effectiveProductIds.Contains(product.Id));
 
         var sql = catalogQuery.ToQueryString();
 
         Assert.Contains("EXISTS", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("NOT EXISTS", sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Effective_product_price_query_accepts_product_ids_before_its_record_projection()
+    {
+        using var context = CreateContext();
+        var unitOfWork = new UnitOfWork(context, NullLogger<UnitOfWork>.Instance);
+        var resolver = new EffectivePriceResolver(unitOfWork);
+
+        var sql = resolver.QueryEffectiveProductPrices(DateTime.UtcNow, [Guid.NewGuid()]).ToQueryString();
+
+        Assert.Contains("ProductId", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     private static ApplicationDbContext CreateContext()

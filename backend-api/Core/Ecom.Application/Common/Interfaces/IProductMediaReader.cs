@@ -9,4 +9,7 @@ public interface IProductMediaReader
 
     Task<IReadOnlyDictionary<Guid, ProductMediaDto>> GetPrimaryPublicMediaAsync(
         IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<Guid, ProductMediaDto>> GetPrimaryCleanPublicMediaAsync(
+        IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default);
 }

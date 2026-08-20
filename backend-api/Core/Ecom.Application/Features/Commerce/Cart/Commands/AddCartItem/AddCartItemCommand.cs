@@ -9,7 +9,8 @@ public sealed class AddCartItemCommandValidator : AbstractValidator<AddCartItemC
     public AddCartItemCommandValidator() { RuleFor(x => x.ProductVariantId).NotEmpty(); RuleFor(x => x.Quantity).InclusiveBetween(1, 999); }
 }
 
-public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrincipalResolver principalResolver)
+public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrincipalResolver principalResolver,
+    IEffectivePriceResolver effectivePriceResolver)
     : IRequestHandler<AddCartItemCommand, TResult<CartDto>>
 {
     public async Task<TResult<CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
@@ -19,6 +20,9 @@ public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
         var variant = await unitOfWork.Repository<ProductVariant>().QueryNoTracking().FirstOrDefaultAsync(x => x.Id == request.ProductVariantId && x.Status == VariantStatus.Active, cancellationToken);
         if (variant is null || !await unitOfWork.Repository<Product>().AnyAsync([x => x.Id == variant.ProductId && x.Status == ProductStatus.Published]))
             return TResult<CartDto>.Failure("Product variant is unavailable.", ErrorCodes.UNPROCESSABLE_ENTITY);
+        var effectivePrices = await effectivePriceResolver.ResolveForVariantsAsync([variant.Id], now, cancellationToken);
+        if (!effectivePrices.ContainsKey(variant.Id))
+            return TResult<CartDto>.Failure("Product variant does not have an active price.", ErrorCodes.UNPROCESSABLE_ENTITY);
 
         var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstOrDefaultAsync(
             principal.UserId.HasValue ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active, cancellationToken);

@@ -3,6 +3,7 @@ using System;
 using Ecom.Infrastructure.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ecom.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260820143445_AddProductBrandName")]
+    partial class AddProductBrandName
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2612,16 +2615,8 @@ namespace Ecom.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"IsDeleted\" = false");
 
-                    b.HasIndex("PlacedAt")
-                        .HasDatabaseName("IX_Order_PlacedAt_Active")
-                        .HasFilter("\"IsDeleted\" = false");
-
                     b.HasIndex("GuestTokenHashSnapshot", "PlacedAt")
                         .HasDatabaseName("IX_Order_GuestTokenHashSnapshot_PlacedAt");
-
-                    b.HasIndex("Status", "PlacedAt")
-                        .HasDatabaseName("IX_Order_Status_PlacedAt_Active")
-                        .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("UserId", "PlacedAt")
                         .HasDatabaseName("IX_Order_UserId_PlacedAt");
@@ -2951,10 +2946,6 @@ namespace Ecom.Infrastructure.Migrations
                     b.HasIndex("No");
 
                     b.HasIndex("OrderId");
-
-                    b.HasIndex("ToStatus", "ChangedAt", "OrderId")
-                        .HasDatabaseName("IX_OrderStatusHistory_ToStatus_ChangedAt_OrderId_Active")
-                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Tbl_OrderStatusHistory", (string)null);
                 });
@@ -3533,10 +3524,6 @@ namespace Ecom.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"IsDeleted\" = false");
 
-                    b.HasIndex("Status", "OrderId")
-                        .HasDatabaseName("IX_Payment_Status_OrderId_Active")
-                        .HasFilter("\"IsDeleted\" = false");
-
                     b.ToTable("Tbl_Payment", null, t =>
                         {
                             t.HasCheckConstraint("CK_Payment_Amount", "\"Amount\" >= 0");
@@ -4104,10 +4091,6 @@ namespace Ecom.Infrastructure.Migrations
 
                     b.HasIndex("Provider", "ProviderReference")
                         .IsUnique()
-                        .HasFilter("\"IsDeleted\" = false");
-
-                    b.HasIndex("TransactionType", "Status", "OccurredAt", "PaymentId")
-                        .HasDatabaseName("IX_PaymentTransaction_Type_Status_OccurredAt_PaymentId_Active")
                         .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Tbl_PaymentTransaction", null, t =>

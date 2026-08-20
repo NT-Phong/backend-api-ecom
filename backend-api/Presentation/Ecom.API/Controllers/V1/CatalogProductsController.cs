@@ -112,8 +112,13 @@ public sealed class CatalogProductsController : BaseController
     public async Task<IActionResult> Discontinue(Guid productId, [FromBody] DiscontinueProductCommand command, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(command with { ProductId = productId }, cancellationToken));
 
+    [HttpPost("{productId:guid}/restore")]
+    [Authorize(Policy = Permissions.CatalogProducts.Publish)]
+    public async Task<IActionResult> Restore(Guid productId, [FromBody] RestoreDiscontinuedProductCommand command, CancellationToken cancellationToken) =>
+        HandleResult(await Mediator.Send(command with { ProductId = productId }, cancellationToken));
+
     [HttpDelete("{productId:guid}")]
     [Authorize(Policy = Permissions.CatalogProducts.Discontinue)]
-    public async Task<IActionResult> Delete(Guid productId, [FromBody] DiscontinueProductCommand command, CancellationToken cancellationToken) =>
+    public async Task<IActionResult> Delete(Guid productId, [FromBody] SoftDeleteProductCommand command, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(command with { ProductId = productId }, cancellationToken));
 }

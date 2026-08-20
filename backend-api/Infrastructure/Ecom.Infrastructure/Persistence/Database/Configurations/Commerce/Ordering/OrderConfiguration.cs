@@ -25,6 +25,10 @@ public sealed class OrderConfiguration : BaseEntityConfiguration<Order>
         CommerceConfigurationSupport.Unique(b, nameof(Order.OrderNumber));
         b.HasIndex(x => new { x.UserId, x.PlacedAt }).HasDatabaseName("IX_Order_UserId_PlacedAt");
         b.HasIndex(x => new { x.GuestTokenHashSnapshot, x.PlacedAt }).HasDatabaseName("IX_Order_GuestTokenHashSnapshot_PlacedAt");
+        b.HasIndex(x => new { x.Status, x.PlacedAt }).HasDatabaseName("IX_Order_Status_PlacedAt_Active")
+            .HasFilter("\"IsDeleted\" = false");
+        b.HasIndex(x => x.PlacedAt).HasDatabaseName("IX_Order_PlacedAt_Active")
+            .HasFilter("\"IsDeleted\" = false");
         b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
         b.HasOne<AdministrativeArea>().WithMany().HasForeignKey(x => x.AdministrativeAreaId).OnDelete(DeleteBehavior.SetNull);
         b.ToTable(t =>

@@ -3,7 +3,7 @@ namespace Ecom.Domain.Tests.Commerce;
 public class ProductAndCartTests
 {
     [Fact]
-    public void Product_requires_publish_prerequisites_and_cannot_restore_discontinued()
+    public void Product_requires_publish_prerequisites_and_rejects_content_changes_while_discontinued()
     {
         var product = Product.Create(Guid.NewGuid(), "Local product", "local-product");
         product.SubmitForReview();
@@ -16,6 +16,31 @@ public class ProductAndCartTests
         Assert.Equal(ProductStatus.Published, product.Status);
         product.Discontinue(DateTime.UtcNow);
         Assert.Throws<CommerceDomainException>(() => product.SubmitForReview());
+    }
+
+    [Fact]
+    public void Discontinued_product_restores_to_paused_before_reentering_review()
+    {
+        var product = Product.Create(Guid.NewGuid(), "Local product", "local-product");
+        product.Discontinue(DateTime.UtcNow.AddMinutes(-1));
+
+        var restoredAt = DateTime.UtcNow;
+        product.RestoreFromDiscontinued(restoredAt);
+
+        Assert.Equal(ProductStatus.Paused, product.Status);
+        Assert.Equal(restoredAt, product.UnpublishedAt);
+        product.SubmitForReview();
+        Assert.Equal(ProductStatus.Review, product.Status);
+    }
+
+    [Fact]
+    public void Product_trims_brand_name_when_details_are_updated()
+    {
+        var product = Product.Create(Guid.NewGuid(), "Local product", "local-product");
+
+        product.UpdateDetails("Local product", "local-product", null, null, null, null, null, null, null, "  Mebieco  ");
+
+        Assert.Equal("Mebieco", product.BrandName);
     }
 
     [Fact]

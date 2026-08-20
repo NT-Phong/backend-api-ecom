@@ -6,9 +6,11 @@ using Ecom.Application.Features.Commerce.Shipments.Commands.PrepareShipment;
 using Ecom.Application.Features.Commerce.Shipments.Commands.StartShipment;
 using Ecom.Application.Features.Commerce.Shipments.Commands.CompleteShipment;
 using Ecom.Application.Features.Commerce.Shipments.Commands.MarkDeliveryFailed;
+using Ecom.Application.Features.Commerce.Inventory.Commands.ReceiveReturnedOrderItems;
 using Ecom.Application.Features.Commerce.Orders.Commands.AddManagementOrderNote;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetManagementOrderById;
 using Ecom.Application.Features.Commerce.Orders.Queries.GetManagementOrders;
+using Ecom.Application.Features.Commerce.Orders.Queries.GetManagementOrderAnalyticsOverview;
 using Ecom.Application.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,12 +24,17 @@ namespace Ecom.API.Controllers.V1;
 public sealed class ManagementOrdersController : BaseController
 {
     [HttpGet]
-    [Authorize(Policy = Permissions.Orders.Manage)]
+    [Authorize(Policy = Permissions.Orders.Read)]
     public async Task<IActionResult> GetOrders([FromQuery] GetManagementOrdersQuery query, CancellationToken ct) => HandleResult(await Mediator.Send(query, ct));
 
     [HttpGet("{orderId:guid}")]
-    [Authorize(Policy = Permissions.Orders.Manage)]
+    [Authorize(Policy = Permissions.Orders.Read)]
     public async Task<IActionResult> GetOrder(Guid orderId, CancellationToken ct) => HandleResult(await Mediator.Send(new GetManagementOrderByIdQuery(orderId), ct));
+
+    [HttpGet("analytics/overview")]
+    [Authorize(Policy = Permissions.Orders.Read)]
+    public async Task<IActionResult> GetAnalyticsOverview([FromQuery] GetManagementOrderAnalyticsOverviewQuery query, CancellationToken ct) =>
+        HandleResult(await Mediator.Send(query, ct));
 
     [HttpPost("{orderId:guid}/confirm")]
     [Authorize(Policy = Permissions.Orders.Manage)]
@@ -77,6 +84,13 @@ public sealed class ManagementOrdersController : BaseController
     [ValidateAntiForgeryToken]
     [EnableRateLimiting(CommerceRateLimitPolicyNames.ManagementMutation)]
     public async Task<IActionResult> MarkDeliveryFailed(Guid orderId, MarkDeliveryFailedCommand command, CancellationToken ct) =>
+        HandleResult(await Mediator.Send(command with { OrderId = orderId }, ct));
+
+    [HttpPost("{orderId:guid}/shipment/receive-return")]
+    [Authorize(Policy = Permissions.Inventory.Adjust)]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(CommerceRateLimitPolicyNames.ManagementMutation)]
+    public async Task<IActionResult> ReceiveReturn(Guid orderId, ReceiveReturnedOrderItemsCommand command, CancellationToken ct) =>
         HandleResult(await Mediator.Send(command with { OrderId = orderId }, ct));
 
     [HttpPost("{orderId:guid}/notes")]

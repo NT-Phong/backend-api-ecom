@@ -103,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ICartPrincipalResolver, CartPrincipalResolver>();
+        services.AddScoped<ICheckoutCartStore, CheckoutCartStore>();
         services.AddScoped<IInventoryReservationStore, InventoryReservationStore>();
         services.AddScoped<IOrderLifecycleStore, OrderLifecycleStore>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();

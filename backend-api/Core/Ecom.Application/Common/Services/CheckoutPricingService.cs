@@ -78,7 +78,9 @@ public sealed class CheckoutPricingService(IUnitOfWork unitOfWork, IEffectivePri
         }).OrderBy(x => x.CartItemId).ToList();
         var subtotal = lines.Sum(x => x.UnitPrice * x.Quantity);
         var fingerprint = CreateFingerprint(lines, shippingAmount, recipient, paymentMethod);
-        return TResult<CheckoutQuote>.Success(new CheckoutQuote(lines, subtotal, shippingAmount, subtotal + shippingAmount, fingerprint));
+        // This is an FE refresh hint only. CreateOrder always recalculates the quote inside its transaction.
+        return TResult<CheckoutQuote>.Success(new CheckoutQuote(lines, subtotal, shippingAmount, subtotal + shippingAmount,
+            fingerprint, now.AddMinutes(5)));
     }
 
     private static bool TryParseFee(string value, out decimal fee)

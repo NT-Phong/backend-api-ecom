@@ -14,19 +14,20 @@ public class Product : BaseEntity, IAggregateRoot
     public DateTime? UnpublishedAt { get; private set; }
     public string? MetaTitle { get; private set; }
     public string? MetaDescription { get; private set; }
+    public string? BrandName { get; private set; }
 
     public static Product Create(Guid producerId, string name, string slug) => new(producerId, name, slug);
 
     public Product(Guid producerId, string name, string slug)
     {
-        ApplyDetails(producerId, name, slug, null, null, null, null, null, null, null);
+        ApplyDetails(producerId, name, slug, null, null, null, null, null, null, null, null);
         Status = ProductStatus.Draft;
     }
 
-    public void UpdateDetails(string name, string slug, string? shortDescription, string? description, string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle, string? metaDescription)
+    public void UpdateDetails(string name, string slug, string? shortDescription, string? description, string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle, string? metaDescription, string? brandName)
     {
         EnsureNotDiscontinued();
-        ApplyDetails(ProducerId, name, slug, shortDescription, description, usageInstructions, storageInstructions, warningText, metaTitle, metaDescription);
+        ApplyDetails(ProducerId, name, slug, shortDescription, description, usageInstructions, storageInstructions, warningText, metaTitle, metaDescription, brandName);
     }
 
     public IReadOnlyList<ProductCategory> ReplaceCategories(ICollection<ProductCategory> categories,
@@ -142,6 +143,17 @@ public class Product : BaseEntity, IAggregateRoot
             return;
         ChangeStatus(ProductStatus.Discontinued);
         UnpublishedAt = discontinuedAt;
+    }
+
+    public void RestoreFromDiscontinued(DateTime restoredAt)
+    {
+        if (Status != ProductStatus.Discontinued)
+            throw new CommerceDomainException("PRODUCT_RESTORE_TRANSITION_INVALID", "Only a discontinued product can be restored.");
+        if (restoredAt == default)
+            throw new CommerceDomainException("PRODUCT_RESTORE_TIME_REQUIRED", "A restore time is required.");
+
+        ChangeStatus(ProductStatus.Paused);
+        UnpublishedAt = restoredAt;
     }
 
     public void EnsureContentCanBeChanged() => EnsureNotDiscontinued();
@@ -268,7 +280,7 @@ public class Product : BaseEntity, IAggregateRoot
             throw new CommerceDomainException("PRODUCT_DISCONTINUED", "A discontinued product cannot be changed.");
     }
 
-    private void ApplyDetails(Guid producerId, string name, string slug, string? shortDescription, string? description, string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle, string? metaDescription)
+    private void ApplyDetails(Guid producerId, string name, string slug, string? shortDescription, string? description, string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle, string? metaDescription, string? brandName)
     {
         if (producerId == Guid.Empty)
             throw new CommerceDomainException("PRODUCT_PRODUCER_REQUIRED", "A producer is required.");
@@ -284,6 +296,7 @@ public class Product : BaseEntity, IAggregateRoot
         WarningText = warningText?.Trim();
         MetaTitle = metaTitle?.Trim();
         MetaDescription = metaDescription?.Trim();
+        BrandName = brandName?.Trim();
     }
 
     private Product()

@@ -8,7 +8,8 @@ public sealed record ExpireReservationsCommand : IRequest<TResult>, ITransaction
 
 public sealed class ExpireReservationsCommandHandler(
     IUnitOfWork unitOfWork,
-    IInventoryReservationStore inventoryReservationStore)
+    IInventoryReservationStore inventoryReservationStore,
+    IOrderLifecycleStore orderLifecycleStore)
     : IRequestHandler<ExpireReservationsCommand, TResult>
 {
     public async Task<TResult> Handle(ExpireReservationsCommand request, CancellationToken cancellationToken)
@@ -33,8 +34,9 @@ public sealed class ExpireReservationsCommandHandler(
 
         foreach (var orderId in expiredOrderIds)
         {
-            var order = await unitOfWork.Repository<Order>().FindByIdAsync(orderId);
-            var payment = await unitOfWork.Repository<Payment>().FindOneAsync([x => x.OrderId == orderId]);
+            // Keep the lifecycle lock order aligned with cancellation and confirmation.
+            var order = await orderLifecycleStore.LockOrderAsync(orderId, cancellationToken);
+            var payment = await orderLifecycleStore.LockPaymentAsync(orderId, cancellationToken);
             if (order is null || payment is null || payment.Status == PaymentStatus.Paid || order.Status != OrderStatus.Pending)
                 continue;
 

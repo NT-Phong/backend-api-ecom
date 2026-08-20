@@ -61,6 +61,6 @@ public sealed class GetCatalogProductByIdQueryHandler(IUnitOfWork unitOfWork, IC
             product.ProducerId, product.Name, product.Slug, product.ShortDescription, product.Description,
             product.UsageInstructions, product.StorageInstructions, product.WarningText, product.MetaTitle,
             product.MetaDescription, product.Status, product.PublishedAt, product.UnpublishedAt,
-            product.ConcurrencyStamp, categories, media, variants, pricePeriods));
+            product.ConcurrencyStamp, categories, media, variants, pricePeriods, product.BrandName));
     }
 }

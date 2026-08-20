@@ -17,7 +17,8 @@ public sealed class CreateProductCommandHandler(IUnitOfWork unitOfWork, ICatalog
 
         var product = Product.Create(request.ProducerId, request.Name, request.Slug);
         product.UpdateDetails(request.Name, request.Slug, request.ShortDescription, request.Description,
-            request.UsageInstructions, request.StorageInstructions, request.WarningText, request.MetaTitle, request.MetaDescription);
+            request.UsageInstructions, request.StorageInstructions, request.WarningText, request.MetaTitle, request.MetaDescription,
+            request.BrandName);
         await unitOfWork.Repository<Product>().InsertAsync(product, cancellationToken);
         return TResult<ProductManagementResult>.Success(new(product.Id, product.Slug, product.Status, product.ConcurrencyStamp));
     }

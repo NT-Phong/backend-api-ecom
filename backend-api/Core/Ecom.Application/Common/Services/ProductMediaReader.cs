@@ -35,6 +35,32 @@ public sealed class ProductMediaReader(
             .ToDictionary(x => x.ProductId, x => x.Media!);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, ProductMediaDto>> GetPrimaryCleanPublicMediaAsync(
+        IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default)
+    {
+        if (productIds.Count == 0) return new Dictionary<Guid, ProductMediaDto>();
+        var ids = productIds.Distinct().ToArray();
+        var rows = await (
+            from link in unitOfWork.Repository<ProductMedia>().QueryNoTracking()
+            join media in unitOfWork.Repository<MediaAsset>().QueryNoTracking() on link.MediaAssetId equals media.Id
+            where ids.Contains(link.ProductId)
+                  && link.IsPrimary
+                  && media.Visibility == MediaVisibility.Public
+                  && media.ScanStatus == MediaScanStatus.Clean
+            orderby link.DisplayOrder, link.Id
+            select new PrimaryPublicMediaRow(
+                link.ProductId,
+                new PublicMediaRow(media.Id, media.StorageKey, media.ContentType, media.AltText,
+                    link.Caption, link.DisplayOrder, link.IsPrimary)))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(x => x.ProductId)
+            .Select(group => new { ProductId = group.Key, Media = CreatePublicMedia(group.First().Media, group.Key) })
+            .Where(x => x.Media is not null)
+            .ToDictionary(x => x.ProductId, x => x.Media!);
+    }
+
     public async Task<IReadOnlyList<ProductMediaDto>> GetPublicMediaAsync(Guid productId,
         CancellationToken cancellationToken = default)
     {

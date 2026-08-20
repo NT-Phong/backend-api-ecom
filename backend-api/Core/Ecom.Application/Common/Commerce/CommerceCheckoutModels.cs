@@ -15,11 +15,13 @@ public sealed record CheckoutLine(Guid CartItemId, Guid ProductVariantId, string
     string Sku, int Quantity, decimal UnitPrice, bool IsTracked);
 
 public sealed record CheckoutQuote(IReadOnlyList<CheckoutLine> Lines, decimal SubtotalAmount,
-    decimal ShippingAmount, decimal GrandTotalAmount, string Fingerprint);
+    decimal ShippingAmount, decimal GrandTotalAmount, string Fingerprint, DateTime QuoteExpiresAt);
 
 public sealed record InventoryLockRequest(Guid ProductVariantId, int Quantity);
 
 public sealed record LockedInventory(Guid ProductVariantId, Guid InventoryItemId, InventoryLevel Level);
+
+public sealed record LockedCheckoutCart(Cart Cart, ICollection<CartItem> Items);
 
 public sealed record InventoryLevelLockRequest(Guid InventoryItemId, Guid StockLocationId);
 

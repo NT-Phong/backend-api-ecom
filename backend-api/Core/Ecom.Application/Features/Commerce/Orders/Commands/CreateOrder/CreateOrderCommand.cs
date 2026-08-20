@@ -22,7 +22,7 @@ public sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrderC
 }
 
 public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrincipalResolver principalResolver,
-    ICheckoutPricingService pricing, IInventoryReservationStore inventoryStore, IIdempotencyStore idempotencyStore,
+    ICheckoutPricingService pricing, ICheckoutCartStore checkoutCartStore, IInventoryReservationStore inventoryStore, IIdempotencyStore idempotencyStore,
     IOrderNumberGenerator orderNumberGenerator)
     : IRequestHandler<CreateOrderCommand, TResult<OrderSummaryDto>>
 {
@@ -45,6 +45,11 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
             return TResult<OrderSummaryDto>.Success(new(previous!.Id, previous.OrderNumber, previous.Status, previousPayment!.Status, previous.GrandTotalAmount, previous.PlacedAt));
         }
 
+        var now = DateTime.UtcNow;
+        var lockedCart = await checkoutCartStore.LockActiveCartAsync(principal, now, cancellationToken);
+        if (lockedCart is null)
+            return TResult<OrderSummaryDto>.Failure("Active cart was not found.", ErrorCodes.NOT_FOUND);
+
         var quoteResult = await pricing.CreateQuoteAsync(principal, request.CartItemIds, recipient, request.PaymentMethod, cancellationToken);
         if (!quoteResult.IsSuccess) return TResult<OrderSummaryDto>.Failure(quoteResult.Error!, quoteResult.ErrorCode);
         var quote = quoteResult.Data;
@@ -56,7 +61,6 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
         var lockResult = await inventoryStore.LockTrackedInventoryAsync(trackedRequests, cancellationToken);
         if (!lockResult.IsSuccess) return TResult<OrderSummaryDto>.Failure(lockResult.Error!, lockResult.ErrorCode);
 
-        var now = DateTime.UtcNow;
         var orderItems = new List<OrderItem>();
         var history = new List<OrderStatusHistory>();
         var order = Order.Create(orderNumberGenerator.Create(now), principal.UserId, principal.GuestTokenHash, recipient.CustomerEmail,
@@ -82,14 +86,11 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
             await unitOfWork.Repository<InventoryLevel>().UpdateAsync(locked.Level, cancellationToken);
         }
 
-        var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstAsync(
-            principal.UserId.HasValue
-                ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now)
-                : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active && (x.ExpiresAt == null || x.ExpiresAt > now),
-            cancellationToken);
-        var cartItems = await unitOfWork.Repository<CartItem>().Query().Where(x => x.CartId == cart.Id).ToListAsync(cancellationToken);
+        var cart = lockedCart.Cart;
+        var cartItems = lockedCart.Items;
         cart.CheckoutSelectedItems(cartItems, request.CartItemIds);
-        foreach (var item in cartItems.Where(x => x.IsDeleted)) await unitOfWork.Repository<CartItem>().DeleteAsync(item, cancellationToken);
+        foreach (var item in cartItems.Where(x => x.IsDeleted))
+            await unitOfWork.Repository<CartItem>().DeleteAsync(item, cancellationToken);
         await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().UpdateAsync(cart, cancellationToken);
 
         begin.Record.Complete(order.Id);

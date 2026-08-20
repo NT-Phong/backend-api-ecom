@@ -65,7 +65,8 @@ public sealed class ReservationExpiryPostgreSqlTests(PostgreSqlFixture fixture)
         await using (var commandContext = fixture.CreateDbContext())
         using (var unitOfWork = new UnitOfWork(commandContext, NullLogger<UnitOfWork>.Instance))
         {
-            var handler = new ExpireReservationsCommandHandler(unitOfWork, new InventoryReservationStore(commandContext));
+            var handler = new ExpireReservationsCommandHandler(unitOfWork, new InventoryReservationStore(commandContext),
+                new OrderLifecycleStore(commandContext));
             Assert.True(await unitOfWork.BeginTransactionAsync());
 
             var result = await handler.Handle(new ExpireReservationsCommand(), CancellationToken.None);

@@ -65,6 +65,17 @@ public class InventoryLevel : BaseEntity
         return InventoryMovement.Create(InventoryItemId, StockLocationId, InventoryMovementType.Ship, -quantity, occurredAt, orderItemId);
     }
 
+    public InventoryMovement ReceiveReturn(decimal quantity, DateTime occurredAt, Guid orderItemId, string reason)
+    {
+        EnsurePositive(quantity);
+        if (orderItemId == Guid.Empty || string.IsNullOrWhiteSpace(reason))
+            throw new CommerceDomainException("INVENTORY_RETURN_DETAILS_REQUIRED", "An order item and return reason are required.");
+        StockedQuantity += quantity;
+        AddDomainEvent(new InventoryChangedEvent(InventoryItemId, StockLocationId, InventoryMovementType.Return, quantity));
+        return InventoryMovement.Create(InventoryItemId, StockLocationId, InventoryMovementType.Return, quantity, occurredAt,
+            orderItemId, reason);
+    }
+
     public InventoryMovement Adjust(decimal quantityDelta, DateTime occurredAt, string reason)
     {
         if (quantityDelta == 0 || string.IsNullOrWhiteSpace(reason))
