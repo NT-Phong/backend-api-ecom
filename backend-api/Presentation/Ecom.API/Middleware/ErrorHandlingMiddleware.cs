@@ -29,6 +29,7 @@ public class ErrorHandlingMiddleware
         {
             var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
             _logger.LogError(ex, "Unhandled request exception. ExceptionType: {ExceptionType}, TraceId: {TraceId}", ex.GetType().Name, traceId);
+            context.Response.Headers["X-Trace-Id"] = traceId;
             await HandleExceptionAsync(context, ex);
         }
     }

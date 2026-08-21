@@ -36,5 +36,16 @@ public class ApiResponse<T>
             Details = details
         };
     }
-} 
+
+    public static ApiResponse<T> Fail(string? message, string errorCode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
+        return new ApiResponse<T>
+        {
+            Success = false,
+            Message = message,
+            ErrorCode = errorCode
+        };
+    }
+}
 

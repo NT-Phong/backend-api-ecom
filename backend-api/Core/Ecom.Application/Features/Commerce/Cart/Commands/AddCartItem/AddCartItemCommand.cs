@@ -10,7 +10,7 @@ public sealed class AddCartItemCommandValidator : AbstractValidator<AddCartItemC
 }
 
 public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrincipalResolver principalResolver,
-    IEffectivePriceResolver effectivePriceResolver)
+    IEffectivePriceResolver effectivePriceResolver, ICartMutationLock cartMutationLock)
     : IRequestHandler<AddCartItemCommand, TResult<CartDto>>
 {
     public async Task<TResult<CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
@@ -24,6 +24,7 @@ public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
         if (!effectivePrices.ContainsKey(variant.Id))
             return TResult<CartDto>.Failure("Product variant does not have an active price.", ErrorCodes.UNPROCESSABLE_ENTITY);
 
+        await cartMutationLock.AcquireAsync(principal, cancellationToken);
         var cart = await unitOfWork.Repository<Ecom.Domain.Entities.Cart>().Query().FirstOrDefaultAsync(
             principal.UserId.HasValue ? x => x.UserId == principal.UserId && x.Status == CartStatus.Active : x => x.GuestTokenHash == principal.GuestTokenHash && x.Status == CartStatus.Active, cancellationToken);
         if (cart is not null && cart.IsExpiredAt(now))

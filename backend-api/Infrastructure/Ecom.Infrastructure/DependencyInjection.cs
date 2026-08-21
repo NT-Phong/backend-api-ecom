@@ -104,10 +104,12 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ICartPrincipalResolver, CartPrincipalResolver>();
         services.AddScoped<ICheckoutCartStore, CheckoutCartStore>();
+        services.AddScoped<ICartMutationLock, CartMutationLock>();
         services.AddScoped<IInventoryReservationStore, InventoryReservationStore>();
         services.AddScoped<IOrderLifecycleStore, OrderLifecycleStore>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<IPublicCatalogReadStore, PublicCatalogReadStore>();
+        services.AddScoped<IManagementDashboardReadStore, ManagementDashboardReadStore>();
         services.AddSingleton<IOrderNumberGenerator, OrderNumberGenerator>();
         services.AddScoped<OutboxMessageDispatcher>();
         services.AddScoped<OutboxProcessor>();

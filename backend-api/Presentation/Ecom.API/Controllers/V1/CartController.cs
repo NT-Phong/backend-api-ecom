@@ -3,7 +3,9 @@ using Ecom.Application.Features.Commerce.Cart.Commands.ChangeCartItemQuantity;
 using Ecom.Application.Features.Commerce.Cart.Commands.RemoveCartItem;
 using Ecom.Application.Features.Commerce.Cart.Commands.MergeGuestCart;
 using Ecom.Application.Features.Commerce.Cart.Queries.GetCart;
+using Ecom.Application.Common.Interfaces;
 using Ecom.Application.Common.Configuration;
+using Ecom.API.Filters;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -35,7 +37,13 @@ public sealed class CartController : BaseController
 
     [HttpPost("merge-guest")]
     [Authorize]
-    [ValidateAntiForgeryToken]
+    [ValidateCommerceAntiforgeryToken]
     [EnableRateLimiting(CommerceRateLimitPolicyNames.CartMutation)]
-    public async Task<IActionResult> MergeGuest(CancellationToken cancellationToken) => HandleResult(await Mediator.Send(new MergeGuestCartCommand(), cancellationToken));
+    public async Task<IActionResult> MergeGuest([FromServices] ICartPrincipalResolver principalResolver, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new MergeGuestCartCommand(), cancellationToken);
+        if (result.IsSuccess)
+            principalResolver.ClearGuestPrincipal();
+        return HandleResult(result);
+    }
 }

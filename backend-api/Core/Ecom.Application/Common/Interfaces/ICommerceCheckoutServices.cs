@@ -27,6 +27,16 @@ public interface ICheckoutCartStore
         CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Serializes mutations that can create or merge an active cart for the same owner.
+/// The lock is transaction-scoped and must be acquired only from transactional commands.
+/// </summary>
+public interface ICartMutationLock
+{
+    Task AcquireAsync(CartPrincipal principal, CancellationToken cancellationToken);
+    Task AcquireForMergeAsync(Guid userId, string guestTokenHash, CancellationToken cancellationToken);
+}
+
 public interface IInventoryReservationStore
 {
     Task<TResult<IReadOnlyDictionary<Guid, LockedInventory>>> LockTrackedInventoryAsync(

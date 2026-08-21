@@ -140,6 +140,144 @@ public sealed class ManagementOrdersApiTests(PostgreSqlFixture fixture)
         Assert.Contains(methods, x => x.GetProperty("paymentMethod").GetString() == "BankTransfer");
     }
 
+    [PostgreSqlFact]
+    public async Task Analytics_uses_vietnam_boundaries_and_emits_empty_day_week_and_month_buckets()
+    {
+        await fixture.ResetDatabaseAsync();
+        var firstDate = new DateOnly(2026, 8, 17);
+        await SeedCompletedPaidOrderAsync(ToUtc(firstDate.AddDays(1), new TimeOnly(23, 59)), PaymentMethod.COD, "BOUNDARY-SKU", 70_000m);
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(Permissions.Orders.Read));
+
+        using var dayResponse = await client.GetAsync(
+            "/api/v1/management/orders/analytics/overview?from=2026-08-17&to=2026-08-19&granularity=Day");
+        Assert.Equal(HttpStatusCode.OK, dayResponse.StatusCode);
+        using var dayDocument = JsonDocument.Parse(await dayResponse.Content.ReadAsStringAsync());
+        var days = dayDocument.RootElement.GetProperty("data").GetProperty("series").EnumerateArray().ToList();
+        Assert.Equal(3, days.Count);
+        Assert.Equal("2026-08-17", days[0].GetProperty("period").GetString());
+        Assert.Equal(0, days[0].GetProperty("ordersPlaced").GetInt32());
+        Assert.Equal("2026-08-18", days[1].GetProperty("period").GetString());
+        Assert.Equal(1, days[1].GetProperty("ordersPlaced").GetInt32());
+        Assert.Equal("2026-08-19", days[2].GetProperty("period").GetString());
+        Assert.Equal(1, days[2].GetProperty("completedOrderCount").GetInt32());
+
+        foreach (var (granularity, expectedPeriod) in new[] { ("Week", "2026-08-17"), ("Month", "2026-08-01") })
+        {
+            using var bucketResponse = await client.GetAsync(
+                $"/api/v1/management/orders/analytics/overview?from=2026-08-17&to=2026-08-19&granularity={granularity}");
+            Assert.Equal(HttpStatusCode.OK, bucketResponse.StatusCode);
+            using var bucketDocument = JsonDocument.Parse(await bucketResponse.Content.ReadAsStringAsync());
+            var bucket = Assert.Single(bucketDocument.RootElement.GetProperty("data").GetProperty("series").EnumerateArray());
+            Assert.Equal(expectedPeriod, bucket.GetProperty("period").GetString());
+        }
+    }
+
+    [PostgreSqlFact]
+    public async Task Dashboard_requires_all_read_permissions_and_aggregates_operational_snapshots()
+    {
+        await fixture.ResetDatabaseAsync();
+        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, VietnamTimeZone));
+        var eventTime = ToUtc(localDate, new TimeOnly(12, 0));
+        await SeedCompletedAndRefundedOrderAsync(eventTime);
+        await SeedPendingOrderAsync(eventTime.AddDays(-2));
+        await SeedDashboardSnapshotAsync(eventTime);
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+        var date = localDate.ToString("yyyy-MM-dd");
+
+        using var anonymous = await client.GetAsync($"/api/v1/management/dashboard/overview?from={date}&to={date}");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+
+        var requiredPermissions = new[]
+        {
+            Permissions.Orders.Read,
+            Permissions.CatalogProducts.Read,
+            Permissions.Inventory.Read,
+            Permissions.Producers.Read,
+            Permissions.User.Read
+        };
+        foreach (var missingPermission in requiredPermissions)
+        {
+            client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(
+                requiredPermissions.Where(permission => permission != missingPermission).ToArray()));
+            using var incompletePermissions = await client.GetAsync($"/api/v1/management/dashboard/overview?from={date}&to={date}");
+            Assert.Equal(HttpStatusCode.Forbidden, incompletePermissions.StatusCode);
+        }
+
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(
+            Permissions.Orders.Read,
+            Permissions.CatalogProducts.Read,
+            Permissions.Inventory.Read,
+            Permissions.Producers.Read,
+            Permissions.User.Read));
+        using var response = await client.GetAsync($"/api/v1/management/dashboard/overview?from={date}&to={date}&granularity=Day&topLimit=10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var data = document.RootElement.GetProperty("data");
+        Assert.Equal("VND", data.GetProperty("currencyCode").GetString());
+        Assert.Equal("Asia/Ho_Chi_Minh", data.GetProperty("timezone").GetString());
+        Assert.False(data.GetRawText().Contains("phoneNumber", StringComparison.OrdinalIgnoreCase));
+        Assert.False(data.GetRawText().Contains("email", StringComparison.OrdinalIgnoreCase));
+        Assert.False(data.GetRawText().Contains("address", StringComparison.OrdinalIgnoreCase));
+        Assert.False(data.GetRawText().Contains("providerReference", StringComparison.OrdinalIgnoreCase));
+        Assert.False(data.GetRawText().Contains("guestToken", StringComparison.OrdinalIgnoreCase));
+
+        var orders = data.GetProperty("orders");
+        Assert.Equal(1, orders.GetProperty("currentPendingFulfillmentCount").GetInt32());
+        Assert.Equal(1, orders.GetProperty("kpis").GetProperty("completedOrderCount").GetInt32());
+        Assert.Equal(0m, orders.GetProperty("kpis").GetProperty("netCollected").GetDecimal());
+
+        var catalog = data.GetProperty("catalog");
+        Assert.Equal(1, catalog.GetProperty("totalProducts").GetInt32());
+        Assert.Equal(1, catalog.GetProperty("draftProducts").GetInt32());
+        Assert.Equal(2, catalog.GetProperty("activeVariants").GetInt32());
+        Assert.Equal(0, catalog.GetProperty("sellableActiveVariants").GetInt32());
+        Assert.Equal(0, catalog.GetProperty("productsWithoutActiveVariant").GetInt32());
+
+        var producers = data.GetProperty("producers");
+        Assert.Equal(2, producers.GetProperty("total").GetInt32());
+        Assert.Equal(1, producers.GetProperty("published").GetInt32());
+        Assert.Equal(1, producers.GetProperty("verified").GetInt32());
+        Assert.Equal(1, producers.GetProperty("unverified").GetInt32());
+
+        var inventory = data.GetProperty("inventory");
+        Assert.Equal(2, inventory.GetProperty("trackedVariantCount").GetInt32());
+        Assert.Equal(15m, inventory.GetProperty("stockedQuantity").GetDecimal());
+        Assert.Equal(2m, inventory.GetProperty("reservedQuantity").GetDecimal());
+        Assert.Equal(13m, inventory.GetProperty("availableQuantity").GetDecimal());
+        Assert.Equal(1, inventory.GetProperty("outOfStockVariantCount").GetInt32());
+
+        var users = data.GetProperty("users");
+        Assert.Equal(2, users.GetProperty("totalRegistered").GetInt32());
+        Assert.Equal(1, users.GetProperty("newRegisteredInPeriod").GetInt32());
+
+        using var legacyAnalytics = await client.GetAsync(
+            $"/api/v1/management/orders/analytics/overview?from={date}&to={date}&granularity=Day&topLimit=10");
+        Assert.Equal(HttpStatusCode.OK, legacyAnalytics.StatusCode);
+        using var legacyAnalyticsDocument = JsonDocument.Parse(await legacyAnalytics.Content.ReadAsStringAsync());
+        var legacyData = legacyAnalyticsDocument.RootElement.GetProperty("data");
+        Assert.Equal(legacyData.GetProperty("kpis").GetRawText(), orders.GetProperty("kpis").GetRawText());
+        Assert.Equal(legacyData.GetProperty("series").GetRawText(), orders.GetProperty("series").GetRawText());
+        Assert.Equal(legacyData.GetProperty("topProducts").GetRawText(), orders.GetProperty("topProducts").GetRawText());
+
+        foreach (var granularity in new[] { "Week", "Month" })
+        {
+            using var bucketResponse = await client.GetAsync(
+                $"/api/v1/management/dashboard/overview?from={date}&to={date}&granularity={granularity}&topLimit=10");
+            Assert.Equal(HttpStatusCode.OK, bucketResponse.StatusCode);
+            using var bucketDocument = JsonDocument.Parse(await bucketResponse.Content.ReadAsStringAsync());
+            Assert.Single(bucketDocument.RootElement.GetProperty("data").GetProperty("orders").GetProperty("series").EnumerateArray());
+        }
+
+        using var invalidRange = await client.GetAsync("/api/v1/management/dashboard/overview?from=2020-01-01");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidRange.StatusCode);
+    }
+
     private async Task SeedCompletedAndRefundedOrderAsync(DateTime eventTime)
     {
         var items = new List<OrderItem>();
@@ -168,6 +306,52 @@ public sealed class ManagementOrdersApiTests(PostgreSqlFixture fixture)
         context.PaymentTransactions.AddRange(paid, refund);
         context.Shipments.Add(shipment);
         context.ShipmentHistories.AddRange(shipmentHistory);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task SeedDashboardSnapshotAsync(DateTime eventTime)
+    {
+        var publishedProducer = Producer.Create("DASH-PUBLISHED", "Published dashboard producer", null, null, null);
+        publishedProducer.Verify(Guid.NewGuid(), eventTime);
+        publishedProducer.Publish();
+        var unverifiedProducer = Producer.Create("DASH-DRAFT", "Draft dashboard producer", null, null, null);
+        var product = Product.Create(publishedProducer.Id, "Dashboard product", "dashboard-product");
+        var stockedVariant = ProductVariant.Create(product.Id, "DASH-STOCKED", "Stocked", InventoryMode.Tracked);
+        var emptyVariant = ProductVariant.Create(product.Id, "DASH-EMPTY", "Empty", InventoryMode.Tracked);
+        var inventoryItem = InventoryItem.Create(stockedVariant.Id);
+        var location = StockLocation.Create("DASH-LOCATION", "Dashboard location", null, null);
+        var secondLocation = StockLocation.Create("DASH-LOCATION-2", "Second dashboard location", null, null);
+        var inventoryLevel = InventoryLevel.Create(inventoryItem.Id, location.Id);
+        inventoryLevel.Receive(10m, eventTime);
+        var secondInventoryLevel = InventoryLevel.Create(inventoryItem.Id, secondLocation.Id);
+        secondInventoryLevel.Receive(5m, eventTime);
+        secondInventoryLevel.Reserve(2m);
+        var newUser = new User("0900000010", null) { CreatedAt = eventTime };
+        var existingUser = new User("0900000011", null) { CreatedAt = eventTime.AddDays(-31) };
+
+        await using var context = fixture.CreateDbContext();
+        context.Producers.AddRange(publishedProducer, unverifiedProducer);
+        context.Products.Add(product);
+        context.ProductVariants.AddRange(stockedVariant, emptyVariant);
+        context.InventoryItems.Add(inventoryItem);
+        context.StockLocations.AddRange(location, secondLocation);
+        context.InventoryLevels.AddRange(inventoryLevel, secondInventoryLevel);
+        context.Users.AddRange(newUser, existingUser);
+        await context.SaveChangesAsync();
+    }
+
+    private async Task SeedPendingOrderAsync(DateTime eventTime)
+    {
+        var items = new List<OrderItem>();
+        var history = new List<OrderStatusHistory>();
+        var order = Order.Create($"PENDING-{Guid.NewGuid():N}", null, $"pending-{Guid.NewGuid():N}", null, "0900000099",
+            "Pending buyer", "0900000099", null, "Pending address", 0m, eventTime,
+            [new OrderLineSnapshot(Guid.NewGuid(), "Pending product", "Default", "PENDING-SKU", 10_000m, 1)], items, history);
+
+        await using var context = fixture.CreateDbContext();
+        context.Orders.Add(order);
+        context.OrderItems.AddRange(items);
+        context.OrderStatusHistories.AddRange(history);
         await context.SaveChangesAsync();
     }
 
