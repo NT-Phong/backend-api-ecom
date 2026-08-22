@@ -1,5 +1,0 @@
-﻿// Deprecated compatibility file.
-// The complete valid ERD is document/DETAILED-ERD.dbml.
-Project ThanhHoaCommerceCore {
-  database_type: 'PostgreSQL'
-}
