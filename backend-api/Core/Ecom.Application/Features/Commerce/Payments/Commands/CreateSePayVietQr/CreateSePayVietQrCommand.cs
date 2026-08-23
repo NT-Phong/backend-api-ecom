@@ -30,11 +30,16 @@ public sealed class CreateSePayVietQrCommandHandler(IUnitOfWork unitOfWork, ICar
         {
             var code = service.PaymentCodePrefix + Convert.ToHexString(RandomNumberGenerator.GetBytes(8));
             attempt = PaymentBankQrAttempt.Create(payment.Id, Provider, code, payment.Amount, order.CurrencyCode, service.VirtualAccountFingerprint, payment.DueAt.Value);
+            attempt.MarkQrIssued(DateTime.UtcNow);
             await unitOfWork.Repository<PaymentBankQrAttempt>().InsertAsync(attempt, ct);
         }
-        if (attempt.Status is PaymentBankQrAttemptStatus.Paid or PaymentBankQrAttemptStatus.NeedsReconciliation)
+        else if (attempt.Status is PaymentBankQrAttemptStatus.Paid or PaymentBankQrAttemptStatus.NeedsReconciliation)
             return TResult<SePayVietQrDto>.Failure("This QR payment attempt is no longer available.", ErrorCodes.UNPROCESSABLE_ENTITY);
-        attempt.MarkQrIssued(DateTime.UtcNow); await unitOfWork.Repository<PaymentBankQrAttempt>().UpdateAsync(attempt, ct);
+        else
+        {
+            attempt.MarkQrIssued(DateTime.UtcNow);
+            await unitOfWork.Repository<PaymentBankQrAttempt>().UpdateAsync(attempt, ct);
+        }
         var qr = service.CreateQrForm(attempt.ExpectedAmount, attempt.PaymentCode, attempt.ExpiresAt);
         return TResult<SePayVietQrDto>.Success(new(order.Id, qr.QrImageUrl, qr.BankCode, qr.VirtualAccountDisplay, qr.AccountHolder, qr.Amount, qr.CurrencyCode, qr.PaymentCode, qr.ExpiresAt));
     }
