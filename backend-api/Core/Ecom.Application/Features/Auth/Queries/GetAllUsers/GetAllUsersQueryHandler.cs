@@ -54,7 +54,7 @@ public class GetAllUsersQueryHandler : IRequestHandler<GetAllUsersQuery, TResult
             var search = request.SearchText.ToLower();
 
             query = query.Where(u =>
-                u.PhoneNumber.Contains(search) ||
+                (u.PhoneNumber ?? string.Empty).Contains(search) ||
                 (u.FullName != null && u.FullName.ToLower().Contains(search)) ||
                 (u.Email != null && u.Email.ToLower().Contains(search)));
         }
@@ -74,7 +74,7 @@ public class GetAllUsersQueryHandler : IRequestHandler<GetAllUsersQuery, TResult
         var results = users.Select(u => new CurrentUserResult
         {
             UserId = u.Id,
-            PhoneNumber = u.PhoneNumber,
+            PhoneNumber = u.PhoneNumber ?? string.Empty,
             FullName = u.FullName,
             Email = u.Email,
             Status = u.Status.ToString(),

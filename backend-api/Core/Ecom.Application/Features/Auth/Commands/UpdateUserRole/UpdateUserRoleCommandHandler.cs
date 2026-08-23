@@ -66,7 +66,7 @@ public class UpdateUserRoleCommandHandler : IRequestHandler<UpdateUserRoleComman
         return TResult<UpdateUserRoleResult>.Success(new UpdateUserRoleResult
         {
             UserId = targetUser.Id,
-            PhoneNumber = targetUser.PhoneNumber,
+            PhoneNumber = targetUser.PhoneNumber ?? string.Empty,
             FullName = targetUser.FullName,
             NewRoleId = newRole.Id,
             NewRoleName = newRole.Name,

@@ -67,7 +67,7 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
 // Design-time stub implementations
 internal class DesignTimeCurrentUser : ICurrentUser
 {
-    private readonly Guid _userId;
+    private readonly Guid _userId = Guid.Empty;
     public string? UserId => "design-time-user";
     public string? UserIdString { get; }
     public string? PhoneNumber { get; }

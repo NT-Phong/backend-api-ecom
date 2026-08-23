@@ -56,7 +56,7 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, TResu
         {
             Id = newUser.Id,
             FullName = newUser.FullName ?? string.Empty,
-            PhoneNumber = newUser.PhoneNumber,
+            PhoneNumber = newUser.PhoneNumber ?? string.Empty,
             RoleId = newUser.RoleId ?? Guid.Empty,
             RoleName = targetRole.Name
         };

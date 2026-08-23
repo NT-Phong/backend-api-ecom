@@ -238,7 +238,7 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 		return TResult<VerifyOtpResult>.Success(new VerifyOtpResult
 		{
 			UserId = user.Id,
-			PhoneNumber = user.PhoneNumber,
+			PhoneNumber = user.PhoneNumber ?? string.Empty,
 			IsProfileCompleted = user.IsProfileCompleted,
 			CanSkipProfile = string.IsNullOrWhiteSpace(user.FullName),
 			ProfileState = string.IsNullOrWhiteSpace(user.FullName) ? "BASIC_PROFILE_MISSING" : "READY",

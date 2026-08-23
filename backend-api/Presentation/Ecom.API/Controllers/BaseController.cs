@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 
 namespace Ecom.API.Controllers;
 
@@ -27,9 +27,9 @@ public abstract class BaseController : ControllerBase
             ErrorCodes.ALREADY_EXISTS => Conflict(ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
             ErrorCodes.UNPROCESSABLE_ENTITY => StatusCode(StatusCodes.Status422UnprocessableEntity, ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
             ErrorCodes.TOO_MANY_REQUESTS => StatusCode(StatusCodes.Status429TooManyRequests, ApiResponse<T>.Fail(result.Error!, result.ErrorCode)),
-            ErrorCodes.EXTERNAL_SERVICE_ERROR => StatusCode(StatusCodes.Status502BadGateway, ApiResponse<T>.Fail(MessageKey.AuthDependencyUnavailable, result.ErrorCode)),
-            ErrorCodes.SERVICE_UNAVAILABLE => StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<T>.Fail(MessageKey.AuthDependencyUnavailable, result.ErrorCode)),
-            ErrorCodes.INTERNAL_SERVER_ERROR or ErrorCodes.SERVER_ERROR => StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<T>.Fail("An internal server error has occurred.", result.ErrorCode)),
+            ErrorCodes.EXTERNAL_SERVICE_ERROR => StatusCode(StatusCodes.Status502BadGateway, ApiResponse<T>.Fail(!string.IsNullOrWhiteSpace(result.Error) ? result.Error : "Dịch vụ liên kết tạm thời không khả dụng.", result.ErrorCode)),
+            ErrorCodes.SERVICE_UNAVAILABLE => StatusCode(StatusCodes.Status503ServiceUnavailable, ApiResponse<T>.Fail(!string.IsNullOrWhiteSpace(result.Error) ? result.Error : "Dịch vụ tạm thời không khả dụng.", result.ErrorCode)),
+            ErrorCodes.INTERNAL_SERVER_ERROR or ErrorCodes.SERVER_ERROR => StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<T>.Fail(!string.IsNullOrWhiteSpace(result.Error) ? result.Error : "An internal server error has occurred.", result.ErrorCode)),
             _ => BadRequest(ApiResponse<T>.Fail(result.Error!, result.ErrorCode))
         };
     }

@@ -1,6 +1,7 @@
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
 
@@ -23,8 +24,6 @@ builder.Services.AddRouting(options =>
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
-
-
 // Add API specific services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddApiServices(builder.Configuration, builder.Environment);
@@ -37,7 +36,7 @@ if (value != null)
 // Request timeout: 10 seconds or custom
 builder.Services.AddRequestTimeouts(options =>
 {
-    options.DefaultPolicy = new Microsoft.AspNetCore.Http.Timeouts.RequestTimeoutPolicy
+    options.DefaultPolicy = new RequestTimeoutPolicy
     {
         Timeout = TimeSpan.FromSeconds(timeout)
     };
@@ -96,6 +95,9 @@ await Ecom.Infrastructure.Seeding.PolicySeeder.SeedAsync(app.Services);
 
 // Seed default roles (SystemAdmin, Admin, Manager, User) and assign policies
 await Ecom.Infrastructure.Seeding.RoleSeeder.SeedAsync(app.Services);
+
+// Seed default system settings (shipping fee, etc.)
+await Ecom.Infrastructure.Seeding.SystemSettingSeeder.SeedAsync(app.Services);
 
 
 
