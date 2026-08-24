@@ -26,7 +26,11 @@ public class PerformanceBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequ
         if (elapsedMilliseconds > 500)
         {
             var requestName = typeof(TRequest).Name;
-            _logger.LogWarning("Long Running Request: {RequestName} ({ElapsedMilliseconds} milliseconds) for user {UserId}", requestName, elapsedMilliseconds, _currentUser.UserId);
+            var actorAuthenticated = _currentUser.IsAuthenticated;
+            var actorResolved = actorAuthenticated && _currentUser.UserId != Guid.Empty;
+            var actorKind = actorResolved ? "Authenticated" : actorAuthenticated ? "AuthenticatedMissingUserId" : "Anonymous";
+            _logger.LogWarning("Long Running Request: {RequestName} ({ElapsedMilliseconds} milliseconds); ActorKind: {ActorKind}; ActorAuthenticated: {ActorAuthenticated}; ActorResolved: {ActorResolved}",
+                requestName, elapsedMilliseconds, actorKind, actorAuthenticated, actorResolved);
         }
         return response;
     }

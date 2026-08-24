@@ -15,7 +15,9 @@ public class LoggingBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest,
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         var requestName = typeof(TRequest).Name;
-        var userId = _currentUser.UserId;
+        var actorAuthenticated = _currentUser.IsAuthenticated;
+        var actorResolved = actorAuthenticated && _currentUser.UserId != Guid.Empty;
+        var actorKind = actorResolved ? "Authenticated" : actorAuthenticated ? "AuthenticatedMissingUserId" : "Anonymous";
         var correlationId = Guid.NewGuid().ToString();
         var requestType = typeof(TRequest).Name.EndsWith("Command") ? "Command" : "Query";
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -25,12 +27,14 @@ public class LoggingBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest,
             ["CorrelationId"] = correlationId,
             ["RequestName"] = requestName,
             ["RequestType"] = requestType,
-            ["UserId"] = userId
+            ["ActorKind"] = actorKind,
+            ["ActorAuthenticated"] = actorAuthenticated,
+            ["ActorResolved"] = actorResolved
         }))
         {
             // BEGIN log with structured properties
-            _logger.LogInformation("[BEGIN] Executing {RequestType} {RequestName} for User {UserId} | CorrelationId: {CorrelationId}", 
-                requestType, requestName, userId, correlationId);
+            _logger.LogInformation("[BEGIN] Executing {RequestType} {RequestName} | ActorKind: {ActorKind}; ActorAuthenticated: {ActorAuthenticated}; ActorResolved: {ActorResolved}; CorrelationId: {CorrelationId}",
+                requestType, requestName, actorKind, actorAuthenticated, actorResolved, correlationId);
             
             try
             {
@@ -40,8 +44,8 @@ public class LoggingBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest,
                 var duration = stopwatch.ElapsedMilliseconds;
                 var success = response is not IResult result || result.IsSuccess;
 
-                _logger.LogInformation("[END] {RequestType} {RequestName} completed in {Duration}ms | Success: {Success} | User: {UserId} | CorrelationId: {CorrelationId}",
-                    requestType, requestName, duration, success, userId, correlationId);
+                _logger.LogInformation("[END] {RequestType} {RequestName} completed in {Duration}ms | Success: {Success}; ActorKind: {ActorKind}; ActorAuthenticated: {ActorAuthenticated}; ActorResolved: {ActorResolved}; CorrelationId: {CorrelationId}",
+                    requestType, requestName, duration, success, actorKind, actorAuthenticated, actorResolved, correlationId);
                     
                 return response;
             }
@@ -51,8 +55,8 @@ public class LoggingBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest,
                 var duration = stopwatch.ElapsedMilliseconds;
                 var success = false;
                 
-                _logger.LogError("[END] {RequestType} {RequestName} failed in {Duration}ms | Success: {Success} | User: {UserId} | ExceptionType: {ExceptionType} | CorrelationId: {CorrelationId}",
-                    requestType, requestName, duration, success, userId, ex.GetType().Name, correlationId);
+                _logger.LogError("[END] {RequestType} {RequestName} failed in {Duration}ms | Success: {Success}; ActorKind: {ActorKind}; ActorAuthenticated: {ActorAuthenticated}; ActorResolved: {ActorResolved}; ExceptionType: {ExceptionType}; CorrelationId: {CorrelationId}",
+                    requestType, requestName, duration, success, actorKind, actorAuthenticated, actorResolved, ex.GetType().Name, correlationId);
                     
                 throw;
             }

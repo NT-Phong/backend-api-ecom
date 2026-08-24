@@ -29,7 +29,8 @@ public class AuditableEntityInterceptor : SaveChangesInterceptor
     {
         if (context == null) return;
 
-        Guid? currentUserId = _currentUser.UserId;
+        var resolvedUserId = _currentUser.UserId;
+        Guid? currentUserId = resolvedUserId == Guid.Empty ? null : resolvedUserId;
         var utcNow = _dateTime.UtcNow.UtcDateTime;
 
         foreach (var entry in context.ChangeTracker.Entries())

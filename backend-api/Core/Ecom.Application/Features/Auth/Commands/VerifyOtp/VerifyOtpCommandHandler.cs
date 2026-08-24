@@ -97,7 +97,8 @@ public class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, TResult
 			await _unitOfWork.SaveChangesAsync(cancellationToken);
 
 			var loginStatus = ResolveLoginStatus(user, isFirstTime);
-			_logger.LogInformation("OTP login succeeded. UserId: {UserId}", user.Id);
+			_logger.LogInformation("OTP login succeeded. EntityUserIdPresent: {EntityUserIdPresent}; AccessTokenIssued: {AccessTokenIssued}",
+				user.Id != Guid.Empty, !string.IsNullOrEmpty(accessToken));
 
 			return Success(user, loginStatus, accessToken, refreshToken, policies);
 		}
