@@ -8,6 +8,7 @@ using Ecom.Application.Features.Catalog.Commands.ReplaceProductCategories;
 using Ecom.Application.Features.Catalog.Products.Commands.UpdateProductDetails;
 using Ecom.Application.Features.Catalog.Queries.GetCatalogProductById;
 using Ecom.Application.Features.Catalog.Queries.GetCatalogProductList;
+using Ecom.Application.Features.Catalog.Queries.GetCatalogProductReadiness;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Ecom.API.Controllers.V1;
@@ -26,6 +27,12 @@ public sealed class CatalogProductsController : BaseController
     [Authorize(Policy = Permissions.CatalogProducts.Read)]
     public async Task<IActionResult> GetById(Guid productId, CancellationToken cancellationToken) =>
         HandleResult(await Mediator.Send(new GetCatalogProductByIdQuery(productId), cancellationToken));
+
+    [HttpGet("{productId:guid}/readiness")]
+    [Authorize(Policy = Permissions.CatalogProducts.Read)]
+    [Authorize(Policy = Permissions.Inventory.Read)]
+    public async Task<IActionResult> GetReadiness(Guid productId, CancellationToken cancellationToken) =>
+        HandleResult(await Mediator.Send(new GetCatalogProductReadinessQuery(productId), cancellationToken));
 
     [HttpPost]
     [Authorize(Policy = Permissions.CatalogProducts.Create)]

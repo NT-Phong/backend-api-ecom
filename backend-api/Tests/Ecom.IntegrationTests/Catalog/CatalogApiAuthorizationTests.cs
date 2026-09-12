@@ -10,6 +10,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Ecom.IntegrationTests.Catalog;
 
@@ -50,6 +51,129 @@ public sealed class CatalogApiAuthorizationTests(PostgreSqlFixture fixture)
         var item = Assert.Single(items, item => string.Equals(item.GetProperty("slug").GetString(), product.Slug, StringComparison.Ordinal));
         Assert.True(item.GetProperty("hasEffectivePrice").GetBoolean());
         Assert.Equal(123_000m, item.GetProperty("fromPrice").GetDecimal());
+        Assert.Equal("Available", item.GetProperty("availability").GetString());
+        using var detailDocument = JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+        Assert.Equal("Available", detailDocument.RootElement.GetProperty("data").GetProperty("availability").GetString());
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_availability_uses_effective_price_and_main_inventory_without_disclosing_quantities()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+
+        async Task<JsonElement> GetItemAsync()
+        {
+            using var response = await client.GetAsync("/api/v1/products");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return document.RootElement.GetProperty("data").GetProperty("items").EnumerateArray()
+                .Single(item => item.GetProperty("id").GetGuid() == product.ProductId).Clone();
+        }
+
+        var available = await GetItemAsync();
+        Assert.Equal("Available", available.GetProperty("availability").GetString());
+        Assert.False(available.TryGetProperty("stockedQuantity", out _));
+        Assert.False(available.TryGetProperty("reservedQuantity", out _));
+        Assert.False(available.TryGetProperty("availableQuantity", out _));
+
+        await using (var context = fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "Tbl_ProductVariant" SET "InventoryMode" = {"Tracked"}
+                WHERE "ProductId" = {product.ProductId};
+                """);
+        }
+        var outOfStock = await GetItemAsync();
+        Assert.Equal("OutOfStock", outOfStock.GetProperty("availability").GetString());
+
+        await using (var context = fixture.CreateDbContext())
+        {
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "Tbl_VariantPrice" SET "EffectiveTo" = {DateTime.UtcNow.AddMinutes(-1)}
+                WHERE "ProductVariantId" IN (SELECT "Id" FROM "Tbl_ProductVariant" WHERE "ProductId" = {product.ProductId});
+                """);
+        }
+        var unavailable = await GetItemAsync();
+        Assert.Equal("Unavailable", unavailable.GetProperty("availability").GetString());
+    }
+
+    [PostgreSqlFact]
+    public async Task Historical_product_slug_returns_a_permanent_redirect_to_the_current_published_slug()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        var oldSlug = $"old-{product.Slug}";
+        await using (var context = fixture.CreateDbContext())
+        {
+            context.ProductSlugHistories.Add(ProductSlugHistory.Create(product.ProductId, oldSlug));
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var response = await client.GetAsync($"/api/v1/products/{oldSlug}");
+
+        Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+        Assert.Equal($"/api/v1/products/{product.Slug}", response.Headers.Location?.OriginalString);
+    }
+
+    [PostgreSqlFact]
+    public async Task Public_search_and_suggestions_apply_public_projection_and_return_facets()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+
+        using var search = await client.GetAsync("/api/v1/search/products?q=public&sort=relevance");
+        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
+        using (var document = JsonDocument.Parse(await search.Content.ReadAsStringAsync()))
+        {
+            var data = document.RootElement.GetProperty("data");
+            var item = data.GetProperty("items").EnumerateArray()
+                .Single(x => x.GetProperty("id").GetGuid() == product.ProductId);
+            Assert.Equal("Available", item.GetProperty("availability").GetString());
+            Assert.False(item.TryGetProperty("sku", out _));
+            Assert.Contains(data.GetProperty("categories").EnumerateArray(), x => x.GetProperty("id").GetGuid() == product.CategoryId);
+            Assert.Contains(data.GetProperty("availability").EnumerateArray(), x =>
+                x.GetProperty("availability").GetString() == "Available" && x.GetProperty("count").GetInt32() >= 1);
+        }
+
+        using var suggestions = await client.GetAsync("/api/v1/search/suggestions?q=public");
+        Assert.Equal(HttpStatusCode.OK, suggestions.StatusCode);
+        using var suggestionsDocument = JsonDocument.Parse(await suggestions.Content.ReadAsStringAsync());
+        var suggestion = Assert.Single(suggestionsDocument.RootElement.GetProperty("data").EnumerateArray(),
+            x => x.GetProperty("slug").GetString() == product.Slug);
+        Assert.False(suggestion.TryGetProperty("price", out _));
+    }
+
+    [PostgreSqlFact]
+    public async Task Product_readiness_requires_catalog_and_inventory_read_and_reports_publish_and_sell_facts()
+    {
+        await fixture.ResetDatabaseAsync();
+        var product = await SeedPublishedProductAsync();
+        await using var factory = new CatalogApiFactory(fixture);
+        using var client = factory.CreateClient();
+
+        using var unauthorized = await client.GetAsync($"/api/v1/catalog/products/{product.ProductId}/readiness");
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(Permissions.CatalogProducts.Read));
+        using var forbidden = await client.GetAsync($"/api/v1/catalog/products/{product.ProductId}/readiness");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new("Bearer", CreateAccessToken(
+            Permissions.CatalogProducts.Read, Permissions.Inventory.Read));
+        using var success = await client.GetAsync($"/api/v1/catalog/products/{product.ProductId}/readiness");
+        Assert.Equal(HttpStatusCode.OK, success.StatusCode);
+        using var document = JsonDocument.Parse(await success.Content.ReadAsStringAsync());
+        var data = document.RootElement.GetProperty("data");
+        Assert.True(data.GetProperty("canPublish").GetBoolean());
+        Assert.True(data.GetProperty("canSell").GetBoolean());
+        Assert.All(data.GetProperty("checks").EnumerateArray(), check => Assert.True(check.GetProperty("passed").GetBoolean()));
     }
 
     [PostgreSqlFact]

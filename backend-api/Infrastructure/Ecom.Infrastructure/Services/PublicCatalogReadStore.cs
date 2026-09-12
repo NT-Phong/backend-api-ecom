@@ -15,6 +15,7 @@ namespace Ecom.Infrastructure.Services;
 public sealed class PublicCatalogReadStore(
     ApplicationDbContext db,
     IStorageService storage,
+    IProductAvailabilityReadService availabilityReadService,
     ILogger<PublicCatalogReadStore> logger) : IPublicCatalogReadStore
 {
     public async Task<PaginatedList<ProductListItemDto>> GetProductListAsync(
@@ -41,34 +42,43 @@ public sealed class PublicCatalogReadStore(
 
             var items = new List<ProductListItemDto>();
             var totalCount = 0;
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
-                totalCount = reader.GetInt32(0);
-                var productId = reader.GetGuid(1);
-                var primaryCategory = CreatePrimaryCategory(reader);
-                var primaryMedia = CreatePrimaryMedia(reader, productId);
-                var hasEffectivePrice = !reader.IsDBNull(15);
-                items.Add(new ProductListItemDto(
-                    productId,
-                    reader.GetString(2),
-                    reader.GetString(3),
-                    reader.IsDBNull(4) ? null : reader.GetString(4),
-                    new ProducerSummaryDto(
-                        reader.GetGuid(6),
-                        reader.GetString(7),
-                        reader.GetString(8),
-                        reader.IsDBNull(9) ? null : reader.GetString(9),
-                        reader.IsDBNull(10) ? null : reader.GetString(10)),
-                    primaryCategory,
-                    primaryMedia,
-                    hasEffectivePrice ? reader.GetDecimal(15) : null,
-                    hasEffectivePrice ? reader.GetString(16) : null,
-                    hasEffectivePrice,
-                    reader.GetFieldValue<DateTime>(5)));
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    totalCount = reader.GetInt32(0);
+                    var productId = reader.GetGuid(1);
+                    var primaryCategory = CreatePrimaryCategory(reader);
+                    var primaryMedia = CreatePrimaryMedia(reader, productId);
+                    var hasEffectivePrice = !reader.IsDBNull(15);
+                    items.Add(new ProductListItemDto(
+                        productId,
+                        reader.GetString(2),
+                        reader.GetString(3),
+                        reader.IsDBNull(4) ? null : reader.GetString(4),
+                        new ProducerSummaryDto(
+                            reader.GetGuid(6),
+                            reader.GetString(7),
+                            reader.GetString(8),
+                            reader.IsDBNull(9) ? null : reader.GetString(9),
+                            reader.IsDBNull(10) ? null : reader.GetString(10)),
+                        primaryCategory,
+                        primaryMedia,
+                        hasEffectivePrice ? reader.GetDecimal(15) : null,
+                        hasEffectivePrice ? reader.GetString(16) : null,
+                        hasEffectivePrice,
+                        CatalogAvailabilityStatus.Unavailable,
+                        reader.GetFieldValue<DateTime>(5)));
+                }
             }
 
-            return PaginatedList<ProductListItemDto>.Create(items, totalCount, query.Page, query.PageSize);
+            var availability = await availabilityReadService.ResolveForProductsAsync(items.Select(x => x.Id).ToArray(),
+                DateTime.UtcNow, cancellationToken);
+            var enriched = items.Select(item => item with
+            {
+                Availability = availability.GetValueOrDefault(item.Id, CatalogAvailabilityStatus.Unavailable)
+            }).ToList();
+            return PaginatedList<ProductListItemDto>.Create(enriched, totalCount, query.Page, query.PageSize);
         }
         finally
         {

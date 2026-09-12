@@ -30,7 +30,7 @@ Route đầy đủ và policy thực tế: `Presentation/Ecom.API/Controllers/V1
 
 ## Public storefront contract
 
-`GET /api/v1/products` hỗ trợ `q`, `categorySlug`, `producerId`, `minPrice`, `maxPrice`, `sort`, `page`, `pageSize`. Sort: `newest`, `name-asc`, `price-asc`, `price-desc`. Chỉ Product public-visible được trả; price/media có thể null nếu không có effective price hoặc asset public clean.
+`GET /api/v1/products` hỗ trợ `q`, `categorySlug`, `producerId`, `minPrice`, `maxPrice`, `sort`, `page`, `pageSize`. Sort: `newest`, `name-asc`, `price-asc`, `price-desc`. Public list/detail/variant hiện có thêm `availability` (`Available|OutOfStock|Unavailable`) nhưng không public quantity. `GET /api/v1/products/{slug}` trả 301 đến canonical Product slug khi history hợp lệ và Product vẫn Published. Public discovery dùng `GET /api/v1/search/products` và `GET /api/v1/search/suggestions`; contract FE canonical ở [Catalog Core + Discovery FE Contract](../04-api/CATALOG-CORE-DISCOVERY-FE-CONTRACT.md).
 
 Public list item gồm `id`, `slug`, `name`, `shortDescription`, producer summary, primary category/media, `fromPrice`, `currencyCode`, `hasEffectivePrice`, `publishedAt`. Detail thêm description, usage/storage/warning, SEO, categories, media và purchasable variants. Variant public gồm `id`, `sku`, `name`, price/currency/type, optional weight và option values.
 

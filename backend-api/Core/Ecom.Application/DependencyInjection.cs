@@ -18,6 +18,7 @@ public static class DependencyInjection
             // 2. Sau đó mới chạy cái này để Validate (Lúc này UserId đã có giá trị nên pass)
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehaviour<,>));
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(UnitOfWorkBehavior<,>));
+            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(CatalogAuditBehavior<,>));
         });
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddScoped<IMediaAccessService, Common.Services.MediaAccessService>();
@@ -26,10 +27,15 @@ public static class DependencyInjection
         services.AddScoped<IProductMediaReader, Common.Services.ProductMediaReader>();
 
         services.AddScoped<IEffectivePriceResolver, Common.Services.EffectivePriceResolver>();
+        services.AddScoped<IProductAvailabilityReadService, Common.Services.ProductAvailabilityReadService>();
         services.AddScoped<ICheckoutPricingService, Common.Services.CheckoutPricingService>();
         services.AddScoped<ICatalogProductAccessService, Common.Services.CatalogProductAccessService>();
         services.AddScoped<Features.Catalog.Products.Services.ICatalogProductMutationService,
             Features.Catalog.Products.Services.CatalogProductMutationService>();
+        services.AddScoped<Features.Catalog.Products.Services.ICatalogAuditWriter,
+            Features.Catalog.Products.Services.CatalogAuditWriter>();
+        services.AddScoped<Features.Catalog.Products.Services.ICatalogReadinessService,
+            Features.Catalog.Products.Services.CatalogReadinessService>();
         services.AddScoped<Features.Catalog.Categories.CatalogCategoryCommandService>();
 
         services.AddScoped<Features.Commerce.Producers.ProducerManagementService>();

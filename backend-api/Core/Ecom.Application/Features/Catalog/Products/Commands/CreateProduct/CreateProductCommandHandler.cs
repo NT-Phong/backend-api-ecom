@@ -1,9 +1,11 @@
 using Ecom.Application.Features.Catalog.Common;
+using Ecom.Application.Features.Catalog.Products.Services;
 using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Catalog.Products.Commands.CreateProduct;
 
-public sealed class CreateProductCommandHandler(IUnitOfWork unitOfWork, ICatalogProductAccessService access)
+public sealed class CreateProductCommandHandler(IUnitOfWork unitOfWork, ICatalogProductAccessService access,
+    ICatalogAuditWriter auditWriter)
     : IRequestHandler<CreateProductCommand, TResult<ProductManagementResult>>
 {
     public async Task<TResult<ProductManagementResult>> Handle(CreateProductCommand request, CancellationToken cancellationToken)
@@ -12,14 +14,20 @@ public sealed class CreateProductCommandHandler(IUnitOfWork unitOfWork, ICatalog
         if (!authorization.IsSuccess) return CatalogCommandSupport.Failure<ProductManagementResult>(authorization);
         if (!await unitOfWork.Repository<Producer>().ExistsAsync(request.ProducerId))
             return TResult<ProductManagementResult>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
-        if (await unitOfWork.Repository<Product>().AnyAsync([x => x.Slug == request.Slug.Trim()]))
+        var slug = request.Slug.Trim();
+        if (await unitOfWork.Repository<Product>().AnyAsync([x => x.Slug == slug])
+            || await unitOfWork.Repository<ProductSlugHistory>().AnyAsync([x => x.Slug == slug]))
             return TResult<ProductManagementResult>.Failure("Product slug already exists.", ErrorCodes.ALREADY_EXISTS);
 
-        var product = Product.Create(request.ProducerId, request.Name, request.Slug);
-        product.UpdateDetails(request.Name, request.Slug, request.ShortDescription, request.Description,
+        var product = Product.Create(request.ProducerId, request.Name, slug);
+        product.UpdateDetails(request.Name, slug, request.ShortDescription, request.Description,
             request.UsageInstructions, request.StorageInstructions, request.WarningText, request.MetaTitle, request.MetaDescription,
             request.BrandName);
         await unitOfWork.Repository<Product>().InsertAsync(product, cancellationToken);
+        await auditWriter.WriteAsync("catalog.product.created", product.Id, null,
+            new { product.Id, product.Slug, Status = product.Status.ToString(), product.ConcurrencyStamp, product.ProducerId,
+                ChangedFields = new[] { "Name", "Slug", "ShortDescription", "Description", "UsageInstructions", "StorageInstructions", "WarningText", "MetaTitle", "MetaDescription", "BrandName" } },
+            cancellationToken);
         return TResult<ProductManagementResult>.Success(new(product.Id, product.Slug, product.Status, product.ConcurrencyStamp));
     }
 }

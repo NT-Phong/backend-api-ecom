@@ -7,10 +7,11 @@ namespace Ecom.Application.Features.Catalog.Queries.GetProductBySlug;
 public sealed class GetProductBySlugQueryHandler(
     IUnitOfWork unitOfWork,
     IEffectivePriceResolver effectivePriceResolver,
-    IProductMediaReader productMediaReader)
-    : IRequestHandler<GetProductBySlugQuery, TResult<ProductDetailDto>>
+    IProductMediaReader productMediaReader,
+    IProductAvailabilityReadService availabilityReadService)
+    : IRequestHandler<GetProductBySlugQuery, TResult<PublicProductLookupDto>>
 {
-    public async Task<TResult<ProductDetailDto>> Handle(GetProductBySlugQuery request, CancellationToken cancellationToken)
+    public async Task<TResult<PublicProductLookupDto>> Handle(GetProductBySlugQuery request, CancellationToken cancellationToken)
     {
         var slug = request.Slug.Trim();
         var products = unitOfWork.Repository<Product>().QueryNoTracking();
@@ -28,7 +29,20 @@ public sealed class GetProductBySlugQueryHandler(
             .SingleOrDefaultAsync(cancellationToken);
 
         if (product is null)
-            return TResult<ProductDetailDto>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
+        {
+            var history = await unitOfWork.Repository<ProductSlugHistory>().QueryNoTracking()
+                .SingleOrDefaultAsync(x => x.Slug == slug, cancellationToken);
+            if (history is null)
+                return TResult<PublicProductLookupDto>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND);
+
+            var canonicalSlug = await unitOfWork.Repository<Product>().QueryNoTracking()
+                .Where(x => x.Id == history.ProductId && x.Status == ProductStatus.Published)
+                .Select(x => x.Slug)
+                .SingleOrDefaultAsync(cancellationToken);
+            return string.IsNullOrWhiteSpace(canonicalSlug)
+                ? TResult<PublicProductLookupDto>.Failure(MessageKey.ResourceNotFound, ErrorCodes.NOT_FOUND)
+                : TResult<PublicProductLookupDto>.Success(new PublicProductLookupDto(null, canonicalSlug));
+        }
 
         var publicCategories = (await PublicCategoryVisibility.LoadAsync(unitOfWork, cancellationToken))
             .Where(category => category.Status == CatalogStatus.Published)
@@ -55,7 +69,10 @@ public sealed class GetProductBySlugQueryHandler(
             .Where(x => x.ProductId == product.Id && x.Status == VariantStatus.Active)
             .Select(x => new VariantRow(x.Id, x.Sku, x.Name, x.WeightGrams))
             .ToListAsync(cancellationToken);
-        var prices = await effectivePriceResolver.ResolveForVariantsAsync(variants.Select(x => x.Id).ToArray(), DateTime.UtcNow, cancellationToken);
+        var asOfUtc = DateTime.UtcNow;
+        var prices = await effectivePriceResolver.ResolveForVariantsAsync(variants.Select(x => x.Id).ToArray(), asOfUtc, cancellationToken);
+        var availability = await availabilityReadService.ResolveForVariantsAsync(variants.Select(x => x.Id).ToArray(), asOfUtc,
+            cancellationToken);
 
         var optionValues = await (
             from map in unitOfWork.Repository<ProductVariantOptionValue>().QueryNoTracking()
@@ -73,17 +90,19 @@ public sealed class GetProductBySlugQueryHandler(
             {
                 var price = prices[x.Id];
                 return new ProductVariantDto(x.Id, x.Sku, x.Name, price.Amount, price.CurrencyCode, price.PriceType,
-                    x.WeightGrams, optionValues.Where(v => v.ProductVariantId == x.Id).Select(v => v.Option).ToList());
+                    x.WeightGrams, availability.GetValueOrDefault(x.Id, CatalogAvailabilityStatus.Unavailable),
+                    optionValues.Where(v => v.ProductVariantId == x.Id).Select(v => v.Option).ToList());
             })
             .ToList();
 
-        return TResult<ProductDetailDto>.Success(new ProductDetailDto(product.Id, product.Slug, product.Name,
+        return TResult<PublicProductLookupDto>.Success(new PublicProductLookupDto(new ProductDetailDto(product.Id, product.Slug, product.Name,
             product.ShortDescription, product.Description, product.UsageInstructions, product.StorageInstructions,
             product.WarningText, product.MetaTitle, product.MetaDescription,
             new ProducerSummaryDto(product.ProducerId, product.ProducerCode, product.ProducerName,
                 product.ProducerDescription, product.ProducerWebsiteUrl),
             responseCategories, media, responseVariants, responseVariants.Count > 0,
-            product.PublishedAt ?? DateTime.MinValue));
+            availabilityReadService.SummarizeProduct(availability.Values),
+            product.PublishedAt ?? DateTime.MinValue), null));
     }
 
     private sealed record ProductRow(Guid Id, string Slug, string Name, string? ShortDescription, string? Description,

@@ -109,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderLifecycleStore, OrderLifecycleStore>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<IPublicCatalogReadStore, PublicCatalogReadStore>();
+        services.AddScoped<IPublicCatalogSearchStore, PublicCatalogSearchStore>();
         services.AddScoped<IManagementDashboardReadStore, ManagementDashboardReadStore>();
         services.AddSingleton<IOrderNumberGenerator, OrderNumberGenerator>();
         services.AddScoped<OutboxMessageDispatcher>();

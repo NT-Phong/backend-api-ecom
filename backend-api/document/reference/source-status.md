@@ -23,8 +23,8 @@ Danh sách operation, actor, precondition và state effect đầy đủ nằm t�
 | OTP V1 | Implemented | phone OTP login/register/profile/refresh/logout | production SMS luôn reachable |
 | Password V2 | Implemented behind effective config | register/login/recovery/change/setup/refresh/me | email delivery/feature flag luôn bật |
 | Session/authorization | Implemented | own logout/revoke, management security, role-policy | passkey/OIDC production |
-| Public catalog | Implemented | search/filter/sort/list/detail/category | every product has image/price/stock |
-| Catalog management | Implemented | product/category/variant/price/media lifecycle | one-shot save-all API |
+| Public catalog | Implemented source/build | browse list/detail/category; discovery search/suggestions; public availability and canonical slug redirect | PostgreSQL migration/runtime search plan and browser/BFF redirect smoke have passed |
+| Catalog management | Implemented source/build | product/category/variant/price/media lifecycle; readiness preflight | one-shot save-all API or runtime database readiness evidence |
 | Producer management | Implemented core | create/update/verify/publish/hide/contact/create facility | update/delete facility live |
 | Product media | Implemented ProductImage | upload/metadata/retry/delete/attach | all intents/video/document live |
 | Cart/guest merge | Implemented | guest/user cart and merge | client price or anonymous ownership bypass |
@@ -34,7 +34,7 @@ Danh sách operation, actor, precondition và state effect đầy đủ nằm t�
 | Inventory | Implemented core | locations, zero-level init, adjust, reservation/ship/return | PO/receipt/transfer/stocktake APIs |
 | Dashboard/analytics | Implemented core | overview/order analytics | BI warehouse/real-time finance truth |
 | Settings | Partial typed | standard shipping fee only | generic config/secrets editor |
-| Audit | Partial | read projections | every mutation automatically audited |
+| Audit | Partial | read projections and Catalog Product mutation audit trail | every system mutation automatically audited |
 
 ## Entity-present nhưng không được coi là API hoàn chỉnh
 

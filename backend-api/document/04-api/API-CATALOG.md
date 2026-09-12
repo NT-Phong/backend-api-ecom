@@ -36,7 +36,9 @@ Tất cả URL dưới đây tương đối với base URL môi trường. Respo
 | Method | Route | Query/body | Data |
 | --- | --- | --- | --- |
 | GET | `/api/v1/products` | `q`, `categorySlug`, `producerId`, `minPrice`, `maxPrice`, `sort`, `page`, `pageSize` | paginated public product items |
-| GET | `/api/v1/products/{slug}` | slug | public product detail + variants/media |
+| GET | `/api/v1/products/{slug}` | slug | public product detail + variants/media; old Product slug returns HTTP 301 canonical redirect |
+| GET | `/api/v1/search/products` | `q` required; category/producer/price/availability/sort/paging | public discovery search + category/producer/availability facets |
+| GET | `/api/v1/search/suggestions` | `q` required | tối đa 8 slug/name/safe-primary-media suggestions |
 | GET | `/api/v1/categories` | none | public categories |
 | GET | `/api/v1/categories/{slug}` | slug | public category |
 | GET | `/api/v1/catalog/producers` | Bearer + `CatalogProducts.Create`; `q`, paging | verified + published producer picker |
@@ -48,6 +50,7 @@ Tất cả URL dưới đây tương đối với base URL môi trường. Respo
 | --- | --- | --- | --- |
 | GET/POST | `/api/v1/catalog/products` | Read/Create | list hoặc tạo Product Draft |
 | GET/PUT/DELETE | `/api/v1/catalog/products/{id}` | Read/Update/Discontinue | detail, update, guarded soft-delete |
+| GET | `/api/v1/catalog/products/{id}/readiness` | CatalogProducts.Read + Inventory.Read | canPublish/canSell và readiness checks; không trả quantity |
 | PUT | `/catalog/products/{id}/categories` | Update | replace toàn bộ category assignments |
 | POST/PATCH/DELETE | `/catalog/products/{id}/media...` | Update | attach/update/primary/remove media |
 | POST/PUT | `/catalog/products/{id}/variants...` | Update | create/update variant |

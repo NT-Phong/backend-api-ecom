@@ -16,11 +16,12 @@ Các JSON dưới đây minh họa field và ownership của contract. Tất c�
   "fromPrice": 150000,
   "currencyCode": "VND",
   "hasEffectivePrice": true,
+  "availability": "Available",
   "publishedAt": "2026-08-22T00:00:00Z"
 }
 ```
 
-Public detail thêm content/SEO, categories, media và variants. Variant response có `id`, `sku`, `name`, `price`, `currencyCode`, `priceType`, optional `weightGrams`, `options[]`.
+Public detail thêm content/SEO, categories, media và variants. Product và variant public đều có `availability` (`Available|OutOfStock|Unavailable`); public response không có quantity inventory. Variant response có `id`, `sku`, `name`, `price`, `currencyCode`, `priceType`, optional `weightGrams`, `availability`, `options[]`. Xem contract chi tiết tại [Catalog Core + Discovery FE Contract](CATALOG-CORE-DISCOVERY-FE-CONTRACT.md).
 
 ## Catalog management list item
 

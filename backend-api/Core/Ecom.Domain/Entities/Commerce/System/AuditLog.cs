@@ -14,4 +14,29 @@ public class AuditLog : BaseEntity
     private AuditLog()
     {
     }
+
+    public static AuditLog Create(Guid? actorUserId, string action, string entityName, Guid entityId,
+        string? beforeData, string? afterData, DateTime occurredAt, Guid? correlationId = null,
+        string? ipAddress = null)
+    {
+        if (string.IsNullOrWhiteSpace(action))
+            throw new CommerceDomainException("AUDIT_ACTION_REQUIRED", "An audit action is required.");
+        if (string.IsNullOrWhiteSpace(entityName))
+            throw new CommerceDomainException("AUDIT_ENTITY_REQUIRED", "An audit entity name is required.");
+        if (entityId == Guid.Empty)
+            throw new CommerceDomainException("AUDIT_ENTITY_ID_REQUIRED", "An audit entity ID is required.");
+
+        return new AuditLog
+        {
+            ActorUserId = actorUserId,
+            Action = action.Trim(),
+            EntityName = entityName.Trim(),
+            EntityId = entityId,
+            BeforeData = beforeData,
+            AfterData = afterData,
+            OccurredAt = occurredAt,
+            CorrelationId = correlationId,
+            IpAddress = ipAddress
+        };
+    }
 }
