@@ -10,6 +10,10 @@ public class Order : BaseEntity, IAggregateRoot
     public string RecipientPhoneSnapshot { get; private set; } = string.Empty;
     public Guid? AdministrativeAreaId { get; private set; }
     public string ShippingAddressSnapshot { get; private set; } = string.Empty;
+    public string? CustomerNotesSnapshot { get; private set; }
+    public string? DeliverySlotSnapshot { get; private set; }
+    public string? PackagingOptionSnapshot { get; private set; }
+    public string? AppliedCouponCodeSnapshot { get; private set; }
     public OrderStatus Status { get; private set; }
     public string CurrencyCode { get; private set; } = "VND";
     public decimal SubtotalAmount { get; private set; }
@@ -32,7 +36,11 @@ public class Order : BaseEntity, IAggregateRoot
         DateTime placedAt,
         IEnumerable<OrderLineSnapshot> lines,
         ICollection<OrderItem> orderItems,
-        ICollection<OrderStatusHistory> history)
+        ICollection<OrderStatusHistory> history,
+        string? customerNotes = null,
+        string? deliverySlot = null,
+        string? packagingOption = null,
+        string? appliedCouponCode = null)
     {
         var normalizedGuestTokenHash = guestTokenHash?.Trim();
         if (string.IsNullOrWhiteSpace(orderNumber) || string.IsNullOrWhiteSpace(customerPhone) ||
@@ -61,6 +69,10 @@ public class Order : BaseEntity, IAggregateRoot
             RecipientPhoneSnapshot = recipientPhone.Trim(),
             AdministrativeAreaId = administrativeAreaId,
             ShippingAddressSnapshot = shippingAddress.Trim(),
+            CustomerNotesSnapshot = customerNotes?.Trim(),
+            DeliverySlotSnapshot = deliverySlot?.Trim(),
+            PackagingOptionSnapshot = packagingOption?.Trim(),
+            AppliedCouponCodeSnapshot = appliedCouponCode?.Trim(),
             Status = OrderStatus.Pending,
             ShippingAmount = shippingAmount,
             PlacedAt = placedAt
@@ -97,6 +109,14 @@ public class Order : BaseEntity, IAggregateRoot
 
     public void RetryShipping(Guid? actorId, DateTime changedAt, ICollection<OrderStatusHistory> history) =>
         TransitionTo(OrderStatus.Shipping, actorId, changedAt, null, history, OrderStatus.DeliveryFailed);
+
+    public void ApplyOrderDiscount(decimal discountAmount)
+    {
+        if (discountAmount < 0)
+            throw new CommerceDomainException("ORDER_DISCOUNT_INVALID", "Discount amount cannot be negative.");
+        DiscountAmount += discountAmount;
+        GrandTotalAmount = Math.Max(0, SubtotalAmount - DiscountAmount + ShippingAmount);
+    }
 
     public void Cancel(string reason, Guid? actorId, DateTime changedAt, ICollection<OrderStatusHistory> history)
     {

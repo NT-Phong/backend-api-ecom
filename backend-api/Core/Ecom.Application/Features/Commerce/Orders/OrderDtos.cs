@@ -45,4 +45,8 @@ public sealed record CustomerOrderDetailDto(
     IReadOnlyList<CustomerOrderItemDto> Items,
     CustomerPaymentDto Payment,
     CustomerShipmentDto? Shipment,
-    IReadOnlyList<CustomerOrderTimelineItemDto> Timeline);
+    IReadOnlyList<CustomerOrderTimelineItemDto> Timeline,
+    string? CustomerNotes = null,
+    string? DeliverySlot = null,
+    string? PackagingOption = null,
+    string? AppliedCouponCode = null);

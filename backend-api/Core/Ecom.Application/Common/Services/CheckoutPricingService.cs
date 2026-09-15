@@ -1,18 +1,25 @@
 using System.Security.Cryptography;
 using System.Text;
 using Ecom.Application.Common.Commerce;
+using Ecom.Application.Common.Interfaces;
 using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Common.Services;
 
-public sealed class CheckoutPricingService(IUnitOfWork unitOfWork, IEffectivePriceResolver prices) : ICheckoutPricingService
+public sealed class CheckoutPricingService(
+    IUnitOfWork unitOfWork,
+    IEffectivePriceResolver prices,
+    ICouponCalculationService couponService,
+    ICheckoutShippingService shippingService) : ICheckoutPricingService
 {
-    private const string ShippingFeeSettingKey = "checkout.shipping.standardFeeVnd";
-
     public async Task<TResult<CheckoutQuote>> CreateQuoteAsync(CartPrincipal principal,
         IReadOnlyCollection<Guid> cartItemIds, CheckoutRecipient recipient, PaymentMethod paymentMethod,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? couponCode = null, string? packagingOption = null,
+        CouponValidationMode couponValidationMode = CouponValidationMode.Quote)
     {
+        if (!CheckoutPackaging.TryNormalize(packagingOption, out var canonicalPackaging))
+            return TResult<CheckoutQuote>.Failure("Packaging option is not supported.", ErrorCodes.BAD_REQUEST);
+
         if (cartItemIds.Count == 0)
             return TResult<CheckoutQuote>.Failure("At least one cart item is required.", ErrorCodes.BAD_REQUEST);
 
@@ -63,9 +70,10 @@ public sealed class CheckoutPricingService(IUnitOfWork unitOfWork, IEffectivePri
             }
         }
 
-        var feeSetting = await unitOfWork.Repository<SystemSetting>().FindOneAsync([x => x.SettingKey == ShippingFeeSettingKey]);
-        if (feeSetting is null || !TryParseFee(feeSetting.Value, out var shippingAmount))
-            return TResult<CheckoutQuote>.Failure("Shipping is not configured.", ErrorCodes.SERVICE_UNAVAILABLE);
+        var shippingResult = await shippingService.ResolveShippingAmountAsync(canonicalPackaging, cancellationToken);
+        if (!shippingResult.IsSuccess)
+            return TResult<CheckoutQuote>.Failure(shippingResult.Error!, shippingResult.ErrorCode);
+        var shippingAmount = shippingResult.Data;
 
         var productById = products.ToDictionary(x => x.Id);
         var variantById = variants.ToDictionary(x => x.Id);
@@ -77,24 +85,40 @@ public sealed class CheckoutPricingService(IUnitOfWork unitOfWork, IEffectivePri
                 effectivePrices[variant.Id].Amount, variant.InventoryMode == InventoryMode.Tracked);
         }).OrderBy(x => x.CartItemId).ToList();
         var subtotal = lines.Sum(x => x.UnitPrice * x.Quantity);
-        var fingerprint = CreateFingerprint(lines, shippingAmount, recipient, paymentMethod);
-        // This is an FE refresh hint only. CreateOrder always recalculates the quote inside its transaction.
-        return TResult<CheckoutQuote>.Success(new CheckoutQuote(lines, subtotal, shippingAmount, subtotal + shippingAmount,
-            fingerprint, now.AddMinutes(5)));
-    }
 
-    private static bool TryParseFee(string value, out decimal fee)
-    {
-        var raw = value.Trim().Trim('"');
-        return decimal.TryParse(raw, System.Globalization.NumberStyles.Number,
-            System.Globalization.CultureInfo.InvariantCulture, out fee) && fee >= 0;
+        decimal discountAmount = 0;
+        Guid? couponId = null;
+        Guid? promotionId = null;
+        string? appliedCouponCode = null;
+
+        if (!string.IsNullOrWhiteSpace(couponCode))
+        {
+            var couponResult = await couponService.ValidateAndCalculateAsync(couponCode, principal, lines, subtotal,
+                shippingAmount, cancellationToken, couponValidationMode);
+            if (!couponResult.IsValid)
+                return TResult<CheckoutQuote>.Failure(couponResult.ErrorMessage ?? "Mã giảm giá không hợp lệ.", couponResult.ErrorCode ?? ErrorCodes.UNPROCESSABLE_ENTITY);
+
+            discountAmount = couponResult.DiscountAmount;
+            couponId = couponResult.Coupon?.Id;
+            promotionId = couponResult.Promotion?.Id;
+            appliedCouponCode = couponResult.Coupon?.Code;
+        }
+
+        var grandTotal = Math.Max(0, subtotal - discountAmount + shippingAmount);
+        var fingerprint = CreateFingerprint(lines, shippingAmount, recipient, paymentMethod, appliedCouponCode,
+            discountAmount, canonicalPackaging);
+        // This is an FE refresh hint only. CreateOrder always recalculates the quote inside its transaction.
+        return TResult<CheckoutQuote>.Success(new CheckoutQuote(lines, subtotal, shippingAmount, grandTotal,
+            fingerprint, now.AddMinutes(5), discountAmount, appliedCouponCode, couponId, promotionId,
+            canonicalPackaging));
     }
 
     private static string CreateFingerprint(IEnumerable<CheckoutLine> lines, decimal shippingAmount,
-        CheckoutRecipient recipient, PaymentMethod paymentMethod)
+        CheckoutRecipient recipient, PaymentMethod paymentMethod, string? couponCode, decimal discountAmount,
+        string packagingOption)
     {
         var canonical = string.Join('|', lines.Select(x => $"{x.CartItemId:N}:{x.ProductVariantId:N}:{x.Quantity}:{x.UnitPrice:0.00}"))
-            + $"|{shippingAmount:0.00}|{paymentMethod}|{recipient.RecipientName.Trim()}|{recipient.RecipientPhone.Trim()}|{recipient.ShippingAddress.Trim()}|{recipient.AdministrativeAreaId:N}|{recipient.CustomerEmail?.Trim()}";
+            + $"|{shippingAmount:0.00}|{packagingOption}|{paymentMethod}|{recipient.RecipientName.Trim()}|{recipient.RecipientPhone.Trim()}|{recipient.ShippingAddress.Trim()}|{recipient.AdministrativeAreaId:N}|{recipient.CustomerEmail?.Trim()}|{couponCode?.Trim().ToUpperInvariant()}|{discountAmount:0.00}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 }

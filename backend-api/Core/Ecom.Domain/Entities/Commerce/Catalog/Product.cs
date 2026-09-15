@@ -15,19 +15,24 @@ public class Product : BaseEntity, IAggregateRoot
     public string? MetaTitle { get; private set; }
     public string? MetaDescription { get; private set; }
     public string? BrandName { get; private set; }
+    public string? Standard { get; private set; }
 
-    public static Product Create(Guid producerId, string name, string slug) => new(producerId, name, slug);
+    public static Product Create(Guid producerId, string name, string slug, string? standard = null) =>
+        new(producerId, name, slug, standard);
 
-    public Product(Guid producerId, string name, string slug)
+    public Product(Guid producerId, string name, string slug, string? standard = null)
     {
-        ApplyDetails(producerId, name, slug, null, null, null, null, null, null, null, null);
+        ApplyDetails(producerId, name, slug, null, null, null, null, null, null, null, null, standard);
         Status = ProductStatus.Draft;
     }
 
-    public void UpdateDetails(string name, string slug, string? shortDescription, string? description, string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle, string? metaDescription, string? brandName)
+    public void UpdateDetails(string name, string slug, string? shortDescription, string? description,
+        string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle,
+        string? metaDescription, string? brandName, string? standard = null)
     {
         EnsureNotDiscontinued();
-        ApplyDetails(ProducerId, name, slug, shortDescription, description, usageInstructions, storageInstructions, warningText, metaTitle, metaDescription, brandName);
+        ApplyDetails(ProducerId, name, slug, shortDescription, description, usageInstructions, storageInstructions,
+            warningText, metaTitle, metaDescription, brandName, standard);
     }
 
     public IReadOnlyList<ProductCategory> ReplaceCategories(ICollection<ProductCategory> categories,
@@ -280,7 +285,9 @@ public class Product : BaseEntity, IAggregateRoot
             throw new CommerceDomainException("PRODUCT_DISCONTINUED", "A discontinued product cannot be changed.");
     }
 
-    private void ApplyDetails(Guid producerId, string name, string slug, string? shortDescription, string? description, string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle, string? metaDescription, string? brandName)
+    private void ApplyDetails(Guid producerId, string name, string slug, string? shortDescription, string? description,
+        string? usageInstructions, string? storageInstructions, string? warningText, string? metaTitle,
+        string? metaDescription, string? brandName, string? standard)
     {
         if (producerId == Guid.Empty)
             throw new CommerceDomainException("PRODUCT_PRODUCER_REQUIRED", "A producer is required.");
@@ -297,6 +304,9 @@ public class Product : BaseEntity, IAggregateRoot
         MetaTitle = metaTitle?.Trim();
         MetaDescription = metaDescription?.Trim();
         BrandName = brandName?.Trim();
+        // Null means an older client omitted this newly introduced field; preserve existing data.
+        // An empty value is an explicit clear.
+        Standard = standard is null ? Standard : string.IsNullOrWhiteSpace(standard) ? null : standard.Trim();
     }
 
     private Product()

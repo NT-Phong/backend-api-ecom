@@ -10,6 +10,7 @@ public class ProductVariant : BaseEntity
     public bool AllowBackorder { get; private set; }
     public decimal? WeightGrams { get; private set; }
     public int DisplayOrder { get; private set; }
+    public string? UnitLabel { get; private set; }
 
     public static ProductVariant Create(
         Guid productId,
@@ -19,7 +20,8 @@ public class ProductVariant : BaseEntity
         bool allowBackorder = false,
         string? barcode = null,
         decimal? weightGrams = null,
-        int displayOrder = 0)
+        int displayOrder = 0,
+        string? unitLabel = null)
     {
         if (productId == Guid.Empty)
             throw new CommerceDomainException("VARIANT_PRODUCT_REQUIRED", "A product is required.");
@@ -40,11 +42,13 @@ public class ProductVariant : BaseEntity
             InventoryMode = inventoryMode,
             AllowBackorder = allowBackorder,
             WeightGrams = weightGrams,
-            DisplayOrder = displayOrder
+            DisplayOrder = displayOrder,
+            UnitLabel = string.IsNullOrWhiteSpace(unitLabel) ? null : unitLabel.Trim()
         };
     }
 
-    public void UpdateDetails(string name, string? barcode, decimal? weightGrams, int displayOrder)
+    public void UpdateDetails(string name, string? barcode, decimal? weightGrams, int displayOrder,
+        string? unitLabel = null)
     {
         EnsureMutable();
         if (string.IsNullOrWhiteSpace(name))
@@ -56,6 +60,9 @@ public class ProductVariant : BaseEntity
         Barcode = barcode?.Trim();
         WeightGrams = weightGrams;
         DisplayOrder = displayOrder;
+        // Null preserves values for clients built before UnitLabel was introduced; empty clears it.
+        if (unitLabel is not null)
+            UnitLabel = string.IsNullOrWhiteSpace(unitLabel) ? null : unitLabel.Trim();
     }
 
     public void ChangeInventoryPolicy(InventoryMode inventoryMode, bool allowBackorder)

@@ -1,4 +1,4 @@
-﻿namespace Ecom.Application;
+namespace Ecom.Application;
 
 public static class DependencyInjection
 {
@@ -28,7 +28,10 @@ public static class DependencyInjection
 
         services.AddScoped<IEffectivePriceResolver, Common.Services.EffectivePriceResolver>();
         services.AddScoped<IProductAvailabilityReadService, Common.Services.ProductAvailabilityReadService>();
+        services.AddScoped<ICheckoutShippingService, Common.Services.CheckoutShippingService>();
         services.AddScoped<ICheckoutPricingService, Common.Services.CheckoutPricingService>();
+        services.AddScoped<ICouponCalculationService, Common.Services.CouponCalculationService>();
+        services.AddScoped<Features.Commerce.Cart.ICartReadService, Features.Commerce.Cart.CartReadService>();
         services.AddScoped<ICatalogProductAccessService, Common.Services.CatalogProductAccessService>();
         services.AddScoped<Features.Catalog.Products.Services.ICatalogProductMutationService,
             Features.Catalog.Products.Services.CatalogProductMutationService>();

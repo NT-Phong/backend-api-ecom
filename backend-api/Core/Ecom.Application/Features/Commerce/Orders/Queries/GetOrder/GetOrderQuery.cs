@@ -50,6 +50,7 @@ public sealed class GetOrderQueryHandler(IUnitOfWork unitOfWork, ICartPrincipalR
             order.PlacedAt, order.RecipientNameSnapshot, order.RecipientPhoneSnapshot, order.ShippingAddressSnapshot, items,
             new CustomerPaymentDto(payment.Method, payment.Status, payment.Amount, payment.DueAt, payment.PaidAt), shipment is null ? null :
             new CustomerShipmentDto(shipment.Status, shipment.ShippingMethod, shipment.CarrierName, shipment.TrackingCode, shipment.ShippedAt, shipment.DeliveredAt),
-            orderTimeline.Concat(shipmentTimeline).OrderBy(x => x.OccurredAt).ToList()));
+            orderTimeline.Concat(shipmentTimeline).OrderBy(x => x.OccurredAt).ToList(),
+            order.CustomerNotesSnapshot, order.DeliverySlotSnapshot, order.PackagingOptionSnapshot, order.AppliedCouponCodeSnapshot));
     }
 }

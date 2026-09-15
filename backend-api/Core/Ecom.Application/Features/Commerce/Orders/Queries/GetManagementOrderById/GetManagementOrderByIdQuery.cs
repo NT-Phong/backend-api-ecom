@@ -29,6 +29,7 @@ public sealed class GetManagementOrderByIdQueryHandler(IUnitOfWork unitOfWork, I
             order.SubtotalAmount, order.DiscountAmount, order.ShippingAmount, order.GrandTotalAmount, order.CurrencyCode, order.PlacedAt,
             new CustomerPaymentDto(payment.Method, payment.Status, payment.Amount, payment.DueAt, payment.PaidAt), shipment is null ? null :
             new CustomerShipmentDto(shipment.Status, shipment.ShippingMethod, shipment.CarrierName, shipment.TrackingCode, shipment.ShippedAt, shipment.DeliveredAt),
-            orderItems, notes, orderTimeline.Concat(shipmentTimeline).OrderBy(x => x.OccurredAt).ToList()));
+            orderItems, notes, orderTimeline.Concat(shipmentTimeline).OrderBy(x => x.OccurredAt).ToList(),
+            order.CustomerNotesSnapshot, order.DeliverySlotSnapshot, order.PackagingOptionSnapshot, order.AppliedCouponCodeSnapshot));
     }
 }

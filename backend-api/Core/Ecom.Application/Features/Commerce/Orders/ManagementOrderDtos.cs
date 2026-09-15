@@ -39,4 +39,5 @@ public sealed record ManagementOrderDetailDto(Guid Id, string OrderNumber, Order
     string CustomerPhone, string RecipientName, string RecipientPhone, string ShippingAddress, decimal SubtotalAmount,
     decimal DiscountAmount, decimal ShippingAmount, decimal GrandTotalAmount, string CurrencyCode, DateTime PlacedAt,
     CustomerPaymentDto Payment, CustomerShipmentDto? Shipment, IReadOnlyList<ManagementOrderItemDto> Items,
-    IReadOnlyList<ManagementOrderNoteDto> Notes, IReadOnlyList<ManagementOrderTimelineItemDto> Timeline);
+    IReadOnlyList<ManagementOrderNoteDto> Notes, IReadOnlyList<ManagementOrderTimelineItemDto> Timeline,
+    string? CustomerNotes = null, string? DeliverySlot = null, string? PackagingOption = null, string? AppliedCouponCode = null);

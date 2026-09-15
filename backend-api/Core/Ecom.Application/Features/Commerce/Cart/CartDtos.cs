@@ -2,7 +2,17 @@ using Ecom.Domain.Entities;
 
 namespace Ecom.Application.Features.Commerce.Cart;
 
-public sealed record CartItemDto(Guid Id, Guid ProductVariantId, int Quantity);
+public sealed record CartItemDto(
+    Guid Id,
+    Guid ProductVariantId,
+    int Quantity,
+    string? ProductName = null,
+    string? VariantName = null,
+    string? Sku = null,
+    decimal? UnitPrice = null,
+    string? ImageUrl = null,
+    string? Slug = null,
+    string? UnitLabel = null);
 public sealed record CartDto(Guid? Id, CartStatus? Status, IReadOnlyList<CartItemDto> Items)
 {
     public static CartDto Empty { get; } = new(null, null, []);

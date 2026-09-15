@@ -30,7 +30,7 @@ public sealed class UpdateProductDetailsCommandHandler(IUnitOfWork unitOfWork, I
         product.ReturnToReviewIfPublished(DateTime.UtcNow);
         product.UpdateDetails(request.Name, newSlug, request.ShortDescription, request.Description,
             request.UsageInstructions, request.StorageInstructions, request.WarningText, request.MetaTitle, request.MetaDescription,
-            request.BrandName);
+            request.BrandName, request.Standard);
         if (slugChanged)
         {
             if (conflictingHistory is not null)

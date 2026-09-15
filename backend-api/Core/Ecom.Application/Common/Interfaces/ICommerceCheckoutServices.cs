@@ -15,7 +15,15 @@ public interface ICartPrincipalResolver
 public interface ICheckoutPricingService
 {
     Task<TResult<CheckoutQuote>> CreateQuoteAsync(CartPrincipal principal, IReadOnlyCollection<Guid> cartItemIds,
-        CheckoutRecipient recipient, PaymentMethod paymentMethod, CancellationToken cancellationToken);
+        CheckoutRecipient recipient, PaymentMethod paymentMethod, CancellationToken cancellationToken,
+        string? couponCode = null, string? packagingOption = null,
+        CouponValidationMode couponValidationMode = CouponValidationMode.Quote);
+}
+
+public interface ICheckoutShippingService
+{
+    Task<TResult<decimal>> ResolveShippingAmountAsync(string? packagingOption,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -44,6 +52,16 @@ public interface IInventoryReservationStore
 
     Task<TResult<IReadOnlyDictionary<InventoryLevelLockRequest, InventoryLevel>>> LockInventoryLevelsAsync(
         IReadOnlyCollection<InventoryLevelLockRequest> requests, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Owns coupon/promotion row locks for redemption enforcement. It must only be called from
+/// the CreateOrder transaction; preview validation remains lock-free and non-mutating.
+/// </summary>
+public interface ICouponRedemptionStore
+{
+    Task<LockedCouponPromotion?> LockCouponAndPromotionAsync(string normalizedCouponCode,
+        CancellationToken cancellationToken);
 }
 
 public interface IOrderLifecycleStore

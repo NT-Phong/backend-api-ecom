@@ -10,7 +10,7 @@ public sealed class AddCartItemCommandValidator : AbstractValidator<AddCartItemC
 }
 
 public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrincipalResolver principalResolver,
-    IEffectivePriceResolver effectivePriceResolver, ICartMutationLock cartMutationLock)
+    IEffectivePriceResolver effectivePriceResolver, ICartMutationLock cartMutationLock, ICartReadService cartReadService)
     : IRequestHandler<AddCartItemCommand, TResult<CartDto>>
 {
     public async Task<TResult<CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
@@ -47,6 +47,6 @@ public sealed class AddCartItemCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
         var item = cart.AddItem(items, request.ProductVariantId, request.Quantity);
         if (existing is null) await unitOfWork.Repository<CartItem>().InsertAsync(item, cancellationToken);
         else await unitOfWork.Repository<CartItem>().UpdateAsync(item, cancellationToken);
-        return TResult<CartDto>.Success(CartDtoMapper.Map(cart, items));
+        return TResult<CartDto>.Success(await cartReadService.BuildAsync(cart, items, cancellationToken));
     }
 }

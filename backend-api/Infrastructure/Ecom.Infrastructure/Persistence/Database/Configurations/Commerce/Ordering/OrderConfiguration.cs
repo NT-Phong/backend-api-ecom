@@ -1,4 +1,4 @@
-﻿using Ecom.Domain.Entities;
+using Ecom.Domain.Entities;
 using Ecom.Infrastructure.Persistence.Database.Configurations.Base;
 
 namespace Ecom.Infrastructure.Persistence.Database.Configurations.Commerce;
@@ -15,6 +15,10 @@ public sealed class OrderConfiguration : BaseEntityConfiguration<Order>
         b.Property(x => x.RecipientNameSnapshot).HasMaxLength(200).IsRequired();
         b.Property(x => x.RecipientPhoneSnapshot).HasMaxLength(20).IsRequired();
         b.Property(x => x.ShippingAddressSnapshot).HasMaxLength(1000).IsRequired();
+        b.Property(x => x.CustomerNotesSnapshot).HasMaxLength(1000);
+        b.Property(x => x.DeliverySlotSnapshot).HasMaxLength(100);
+        b.Property(x => x.PackagingOptionSnapshot).HasMaxLength(50);
+        b.Property(x => x.AppliedCouponCodeSnapshot).HasMaxLength(50);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
         b.Property(x => x.CurrencyCode).HasMaxLength(CommerceConstants.CurrencyCodeLength).IsFixedLength()
             .HasDefaultValue(CommerceConstants.DefaultCurrency).IsRequired();

@@ -8,7 +8,8 @@ namespace Ecom.Application.Features.Commerce.Orders.Commands.CreateOrder;
 
 public sealed record CreateOrderCommand(IReadOnlyList<Guid> CartItemIds, string RecipientName, string RecipientPhone,
     string ShippingAddress, Guid? AdministrativeAreaId, string? CustomerEmail, PaymentMethod PaymentMethod,
-    string QuoteFingerprint, string IdempotencyKey, string ShippingMethodCode = "standard") : IRequest<TResult<OrderSummaryDto>>, ITransactionalRequest;
+    string QuoteFingerprint, string IdempotencyKey, string ShippingMethodCode = "standard",
+    string? CouponCode = null, string? Notes = null, string? DeliverySlot = null, string? PackagingOption = null) : IRequest<TResult<OrderSummaryDto>>, ITransactionalRequest;
 
 public sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
 {
@@ -18,6 +19,11 @@ public sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrderC
         RuleFor(x => x.RecipientName).NotEmpty().MaximumLength(200); RuleFor(x => x.RecipientPhone).NotEmpty().MaximumLength(20);
         RuleFor(x => x.ShippingAddress).NotEmpty().MaximumLength(1000); RuleFor(x => x.PaymentMethod).IsInEnum().NotEqual(PaymentMethod.Gateway);
         RuleFor(x => x.QuoteFingerprint).Length(64); RuleFor(x => x.IdempotencyKey).NotEmpty().MaximumLength(200); RuleFor(x => x.ShippingMethodCode).Equal("standard").WithMessage("Only standard shipping is supported.");
+        RuleFor(x => x.CouponCode).MaximumLength(50).When(x => !string.IsNullOrWhiteSpace(x.CouponCode));
+        RuleFor(x => x.Notes).MaximumLength(1000).When(x => !string.IsNullOrWhiteSpace(x.Notes));
+        RuleFor(x => x.DeliverySlot).MaximumLength(100).When(x => !string.IsNullOrWhiteSpace(x.DeliverySlot));
+        RuleFor(x => x.PackagingOption).Must(CheckoutPackaging.IsSupported)
+            .WithMessage("Packaging option must be standard or cold_chain.");
     }
 }
 
@@ -30,10 +36,12 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
     {
         var principal = principalResolver.ResolveExistingPrincipal();
         if (principal is null) return TResult<OrderSummaryDto>.Failure(MessageKey.Unauthorized, ErrorCodes.UNAUTHORIZED);
+        if (!CheckoutPackaging.TryNormalize(request.PackagingOption, out var packagingOption))
+            return TResult<OrderSummaryDto>.Failure("Packaging option is not supported.", ErrorCodes.BAD_REQUEST);
         var recipient = new CheckoutRecipient(request.RecipientName, request.RecipientPhone, request.ShippingAddress,
             request.AdministrativeAreaId, request.CustomerEmail);
         var begin = await idempotencyStore.BeginAsync("orders.create", principal.OwnerScope, request.IdempotencyKey,
-            CreateRequestFingerprint(request, recipient), DateTime.UtcNow.AddHours(24), cancellationToken);
+            CreateRequestFingerprint(request, recipient, packagingOption), DateTime.UtcNow.AddHours(24), cancellationToken);
         if (begin.Kind == IdempotencyBeginKind.Mismatch)
             return TResult<OrderSummaryDto>.Failure("Idempotency key was reused with a different request.", ErrorCodes.ALREADY_EXISTS);
         if (begin.Kind == IdempotencyBeginKind.Processing)
@@ -50,7 +58,8 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
         if (lockedCart is null)
             return TResult<OrderSummaryDto>.Failure("Active cart was not found.", ErrorCodes.NOT_FOUND);
 
-        var quoteResult = await pricing.CreateQuoteAsync(principal, request.CartItemIds, recipient, request.PaymentMethod, cancellationToken);
+        var quoteResult = await pricing.CreateQuoteAsync(principal, request.CartItemIds, recipient, request.PaymentMethod,
+            cancellationToken, request.CouponCode, packagingOption, CouponValidationMode.Redemption);
         if (!quoteResult.IsSuccess) return TResult<OrderSummaryDto>.Failure(quoteResult.Error!, quoteResult.ErrorCode);
         var quote = quoteResult.Data;
         if (!string.Equals(quote.Fingerprint, request.QuoteFingerprint, StringComparison.Ordinal))
@@ -66,10 +75,33 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
         var order = Order.Create(orderNumberGenerator.Create(now), principal.UserId, principal.GuestTokenHash, recipient.CustomerEmail,
             principal.UserId.HasValue ? request.RecipientPhone : request.RecipientPhone, request.RecipientName,
             request.RecipientPhone, request.AdministrativeAreaId, request.ShippingAddress, quote.ShippingAmount, now,
-            quote.Lines.Select(x => new OrderLineSnapshot(x.ProductVariantId, x.ProductName, x.VariantName, x.Sku, x.UnitPrice, x.Quantity)), orderItems, history);
+            quote.Lines.Select(x => new OrderLineSnapshot(x.ProductVariantId, x.ProductName, x.VariantName, x.Sku, x.UnitPrice, x.Quantity)), orderItems, history,
+            customerNotes: request.Notes,
+            deliverySlot: request.DeliverySlot,
+            packagingOption: quote.PackagingOption,
+            appliedCouponCode: quote.CouponCode);
+
+        if (quote.DiscountAmount > 0)
+        {
+            order.ApplyOrderDiscount(quote.DiscountAmount);
+        }
+
         await unitOfWork.Repository<Order>().InsertAsync(order, cancellationToken);
         await unitOfWork.Repository<OrderItem>().InsertRangeAsync(orderItems, cancellationToken);
         await unitOfWork.Repository<OrderStatusHistory>().InsertRangeAsync(history, cancellationToken);
+
+        if (quote.CouponId.HasValue)
+        {
+            var redemption = CouponRedemption.Create(quote.CouponId.Value, principal.UserId, order.Id, quote.DiscountAmount, now);
+            await unitOfWork.Repository<CouponRedemption>().InsertAsync(redemption, cancellationToken);
+
+            if (quote.DiscountAmount > 0)
+            {
+                var orderDiscount = OrderDiscount.Create(order.Id, quote.PromotionId, quote.CouponId,
+                    $"Mã giảm giá: {quote.CouponCode}", quote.DiscountAmount);
+                await unitOfWork.Repository<OrderDiscount>().InsertAsync(orderDiscount, cancellationToken);
+            }
+        }
 
         var payment = Payment.Create(order.Id, request.PaymentMethod, order.GrandTotalAmount, now.AddMinutes(30));
         await unitOfWork.Repository<Payment>().InsertAsync(payment, cancellationToken);
@@ -98,9 +130,10 @@ public sealed class CreateOrderCommandHandler(IUnitOfWork unitOfWork, ICartPrinc
         return TResult<OrderSummaryDto>.Success(new(order.Id, order.OrderNumber, order.Status, payment.Status, order.GrandTotalAmount, order.PlacedAt));
     }
 
-    private static string CreateRequestFingerprint(CreateOrderCommand request, CheckoutRecipient recipient)
+    private static string CreateRequestFingerprint(CreateOrderCommand request, CheckoutRecipient recipient,
+        string packagingOption)
     {
-        var canonical = string.Join(',', request.CartItemIds.OrderBy(x => x)) + $"|{request.QuoteFingerprint}|{request.PaymentMethod}|{request.ShippingMethodCode}|{recipient.RecipientName.Trim()}|{recipient.RecipientPhone.Trim()}|{recipient.ShippingAddress.Trim()}|{recipient.AdministrativeAreaId:N}|{recipient.CustomerEmail?.Trim()}";
+        var canonical = string.Join(',', request.CartItemIds.OrderBy(x => x)) + $"|{request.QuoteFingerprint}|{request.PaymentMethod}|{request.ShippingMethodCode}|{recipient.RecipientName.Trim()}|{recipient.RecipientPhone.Trim()}|{recipient.ShippingAddress.Trim()}|{recipient.AdministrativeAreaId:N}|{recipient.CustomerEmail?.Trim()}|{request.CouponCode?.Trim().ToUpperInvariant()}|{request.Notes?.Trim()}|{request.DeliverySlot?.Trim()}|{packagingOption}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 }

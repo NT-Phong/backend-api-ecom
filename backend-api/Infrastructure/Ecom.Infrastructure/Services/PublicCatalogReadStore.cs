@@ -35,6 +35,7 @@ public sealed class PublicCatalogReadStore(
             AddParameter(command, "search", string.IsNullOrWhiteSpace(query.Q) ? null : query.Q.Trim(), DbType.String);
             AddParameter(command, "categorySlug", string.IsNullOrWhiteSpace(query.CategorySlug) ? null : query.CategorySlug.Trim(), DbType.String);
             AddParameter(command, "producerId", query.ProducerId, DbType.Guid);
+            AddParameter(command, "standard", string.IsNullOrWhiteSpace(query.Standard) ? null : query.Standard.Trim(), DbType.String);
             AddParameter(command, "minPrice", query.MinPrice, DbType.Decimal);
             AddParameter(command, "maxPrice", query.MaxPrice, DbType.Decimal);
             AddParameter(command, "pageSize", query.PageSize, DbType.Int32);
@@ -68,7 +69,9 @@ public sealed class PublicCatalogReadStore(
                         hasEffectivePrice ? reader.GetString(16) : null,
                         hasEffectivePrice,
                         CatalogAvailabilityStatus.Unavailable,
-                        reader.GetFieldValue<DateTime>(5)));
+                        reader.GetFieldValue<DateTime>(5),
+                        reader.IsDBNull(23) ? null : reader.GetString(23),
+                        reader.IsDBNull(24) ? null : reader.GetString(24)));
                 }
             }
 
@@ -150,6 +153,7 @@ public sealed class PublicCatalogReadStore(
                     price."ProductVariantId",
                     price."Amount",
                     price."CurrencyCode",
+                    variant."UnitLabel",
                     ROW_NUMBER() OVER (
                         PARTITION BY price."ProductVariantId"
                         ORDER BY
@@ -177,10 +181,11 @@ public sealed class PublicCatalogReadStore(
                         AND (priceList."EndsAt" IS NULL OR priceList."EndsAt" > @asOfUtc)))
             ),
             "ProductPrices" AS (
-                SELECT "ProductId", MIN("Amount") AS "FromPrice", MIN("CurrencyCode") AS "CurrencyCode"
+                SELECT DISTINCT ON ("ProductId")
+                    "ProductId", "Amount" AS "FromPrice", "CurrencyCode", "UnitLabel"
                 FROM "EffectiveVariantPrices"
                 WHERE "PriceRank" = 1
-                GROUP BY "ProductId"
+                ORDER BY "ProductId", "Amount" ASC, "ProductVariantId" ASC
             ),
             "PublicProducts" AS (
                 SELECT
@@ -189,6 +194,7 @@ public sealed class PublicCatalogReadStore(
                     product."Name",
                     product."ShortDescription",
                     product."PublishedAt",
+                    product."Standard" AS "Standard",
                     producer."Id" AS "ProducerId",
                     producer."Code" AS "ProducerCode",
                     producer."Name" AS "ProducerName",
@@ -200,6 +206,7 @@ public sealed class PublicCatalogReadStore(
                     category."DisplayOrder" AS "CategoryDisplayOrder",
                     prices."FromPrice",
                     prices."CurrencyCode",
+                    prices."UnitLabel",
                     media."MediaAssetId",
                     media."StorageKey" AS "MediaStorageKey",
                     media."ContentType" AS "MediaContentType",
@@ -249,6 +256,7 @@ public sealed class PublicCatalogReadStore(
                     AND (@search IS NULL OR product."Name" ILIKE '%' || @search || '%'
                         OR COALESCE(product."ShortDescription", '') ILIKE '%' || @search || '%')
                     AND (@producerId IS NULL OR producer."Id" = @producerId)
+                    AND (@standard IS NULL OR product."Standard" = @standard)
                     AND (@minPrice IS NULL OR prices."FromPrice" >= @minPrice)
                     AND (@maxPrice IS NULL OR prices."FromPrice" <= @maxPrice)
                     AND (@categorySlug IS NULL OR EXISTS (
@@ -273,7 +281,8 @@ public sealed class PublicCatalogReadStore(
                 "ProducerId", "ProducerCode", "ProducerName", "ProducerDescription", "ProducerWebsiteUrl",
                 "CategoryId", "CategoryName", "CategorySlug", "CategoryDisplayOrder",
                 "FromPrice", "CurrencyCode",
-                "MediaAssetId", "MediaStorageKey", "MediaContentType", "MediaAltText", "MediaCaption", "MediaDisplayOrder"
+                "MediaAssetId", "MediaStorageKey", "MediaContentType", "MediaAltText", "MediaCaption", "MediaDisplayOrder",
+                "Standard", "UnitLabel"
             FROM "PublicProducts"
             ORDER BY {{orderBy}}
             LIMIT @pageSize OFFSET @offset;

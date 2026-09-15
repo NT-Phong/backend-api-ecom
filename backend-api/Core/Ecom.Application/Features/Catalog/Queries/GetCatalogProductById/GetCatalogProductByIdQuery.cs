@@ -36,7 +36,7 @@ public sealed class GetCatalogProductByIdQueryHandler(IUnitOfWork unitOfWork, IC
             .Where(x => x.ProductId == product.Id)
             .OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name)
             .Select(x => new CatalogProductVariantDto(x.Id, x.Sku, x.Name, x.Status, x.InventoryMode,
-                x.AllowBackorder, x.Barcode, x.WeightGrams, x.DisplayOrder))
+                x.AllowBackorder, x.Barcode, x.WeightGrams, x.DisplayOrder, x.UnitLabel))
             .ToListAsync(cancellationToken);
 
         var media = await (
@@ -61,6 +61,6 @@ public sealed class GetCatalogProductByIdQueryHandler(IUnitOfWork unitOfWork, IC
             product.ProducerId, product.Name, product.Slug, product.ShortDescription, product.Description,
             product.UsageInstructions, product.StorageInstructions, product.WarningText, product.MetaTitle,
             product.MetaDescription, product.Status, product.PublishedAt, product.UnpublishedAt,
-            product.ConcurrencyStamp, categories, media, variants, pricePeriods, product.BrandName));
+            product.ConcurrencyStamp, categories, media, variants, pricePeriods, product.BrandName, product.Standard));
     }
 }

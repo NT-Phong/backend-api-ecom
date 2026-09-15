@@ -19,14 +19,14 @@ public sealed class CreateProductCommandHandler(IUnitOfWork unitOfWork, ICatalog
             || await unitOfWork.Repository<ProductSlugHistory>().AnyAsync([x => x.Slug == slug]))
             return TResult<ProductManagementResult>.Failure("Product slug already exists.", ErrorCodes.ALREADY_EXISTS);
 
-        var product = Product.Create(request.ProducerId, request.Name, slug);
+        var product = Product.Create(request.ProducerId, request.Name, slug, request.Standard);
         product.UpdateDetails(request.Name, slug, request.ShortDescription, request.Description,
             request.UsageInstructions, request.StorageInstructions, request.WarningText, request.MetaTitle, request.MetaDescription,
-            request.BrandName);
+            request.BrandName, request.Standard);
         await unitOfWork.Repository<Product>().InsertAsync(product, cancellationToken);
         await auditWriter.WriteAsync("catalog.product.created", product.Id, null,
             new { product.Id, product.Slug, Status = product.Status.ToString(), product.ConcurrencyStamp, product.ProducerId,
-                ChangedFields = new[] { "Name", "Slug", "ShortDescription", "Description", "UsageInstructions", "StorageInstructions", "WarningText", "MetaTitle", "MetaDescription", "BrandName" } },
+                ChangedFields = new[] { "Name", "Slug", "ShortDescription", "Description", "UsageInstructions", "StorageInstructions", "WarningText", "MetaTitle", "MetaDescription", "BrandName", "Standard" } },
             cancellationToken);
         return TResult<ProductManagementResult>.Success(new(product.Id, product.Slug, product.Status, product.ConcurrencyStamp));
     }

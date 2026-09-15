@@ -8,7 +8,27 @@ public class OrderDiscount : BaseEntity
     public string Description { get; private set; } = string.Empty;
     public decimal DiscountAmount { get; private set; }
 
-    private OrderDiscount()
+    public static OrderDiscount Create(
+        Guid orderId,
+        Guid? promotionId,
+        Guid? couponId,
+        string description,
+        decimal discountAmount,
+        Guid? orderItemId = null)
     {
+        if (orderId == Guid.Empty)
+            throw new CommerceDomainException("ORDER_DISCOUNT_ORDER_REQUIRED", "Order ID is required.");
+        if (discountAmount < 0)
+            throw new CommerceDomainException("ORDER_DISCOUNT_AMOUNT_INVALID", "Discount amount cannot be negative.");
+
+        return new OrderDiscount
+        {
+            OrderId = orderId,
+            OrderItemId = orderItemId,
+            PromotionId = promotionId,
+            CouponId = couponId,
+            Description = description?.Trim() ?? string.Empty,
+            DiscountAmount = discountAmount
+        };
     }
 }

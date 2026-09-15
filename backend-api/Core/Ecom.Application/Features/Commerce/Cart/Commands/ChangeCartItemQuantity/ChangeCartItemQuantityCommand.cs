@@ -6,7 +6,8 @@ public sealed record ChangeCartItemQuantityCommand(Guid CartItemId, int Quantity
 public sealed class ChangeCartItemQuantityCommandValidator : AbstractValidator<ChangeCartItemQuantityCommand>
 { public ChangeCartItemQuantityCommandValidator() { RuleFor(x => x.CartItemId).NotEmpty(); RuleFor(x => x.Quantity).InclusiveBetween(1, 999); } }
 
-public sealed class ChangeCartItemQuantityCommandHandler(IUnitOfWork unitOfWork, ICartPrincipalResolver principalResolver)
+public sealed class ChangeCartItemQuantityCommandHandler(IUnitOfWork unitOfWork, ICartPrincipalResolver principalResolver,
+    ICartReadService cartReadService)
     : IRequestHandler<ChangeCartItemQuantityCommand, TResult<CartDto>>
 {
     public async Task<TResult<CartDto>> Handle(ChangeCartItemQuantityCommand request, CancellationToken cancellationToken)
@@ -23,6 +24,6 @@ public sealed class ChangeCartItemQuantityCommandHandler(IUnitOfWork unitOfWork,
         cart.ChangeQuantity(item, request.Quantity);
         await unitOfWork.Repository<CartItem>().UpdateAsync(item, cancellationToken);
         var items = await unitOfWork.Repository<CartItem>().Query().Where(x => x.CartId == cart.Id).ToListAsync(cancellationToken);
-        return TResult<CartDto>.Success(CartDtoMapper.Map(cart, items));
+        return TResult<CartDto>.Success(await cartReadService.BuildAsync(cart, items, cancellationToken));
     }
 }

@@ -4,7 +4,7 @@ namespace Ecom.Application.Features.Commerce.Cart.Commands.MergeGuestCart;
 
 public sealed record MergeGuestCartCommand : IRequest<TResult<CartDto>>, ITransactionalRequest;
 public sealed class MergeGuestCartCommandHandler(IUnitOfWork uow, ICurrentUser current, ICartPrincipalResolver principals,
-    ICartMutationLock cartMutationLock)
+    ICartMutationLock cartMutationLock, ICartReadService cartReadService)
     : IRequestHandler<MergeGuestCartCommand, TResult<CartDto>>
 {
     public async Task<TResult<CartDto>> Handle(MergeGuestCartCommand request, CancellationToken ct)
@@ -29,7 +29,7 @@ public sealed class MergeGuestCartCommandHandler(IUnitOfWork uow, ICurrentUser c
         foreach (var item in targetItems.Where(x => !before.Contains(x.Id))) await uow.Repository<CartItem>().InsertAsync(item, ct);
         foreach (var item in targetItems.Where(x => before.Contains(x.Id))) await uow.Repository<CartItem>().UpdateAsync(item, ct);
         await uow.Repository<Ecom.Domain.Entities.Cart>().UpdateAsync(source, ct);
-        return TResult<CartDto>.Success(CartDtoMapper.Map(target, targetItems));
+        return TResult<CartDto>.Success(await cartReadService.BuildAsync(target, targetItems, ct));
     }
 
     private async Task<CartDto> GetActiveUserCartAsync(CancellationToken ct)
@@ -40,6 +40,6 @@ public sealed class MergeGuestCartCommandHandler(IUnitOfWork uow, ICurrentUser c
             return CartDto.Empty;
 
         var items = await uow.Repository<CartItem>().Query().Where(x => x.CartId == target.Id).ToListAsync(ct);
-        return CartDtoMapper.Map(target, items);
+        return await cartReadService.BuildAsync(target, items, ct);
     }
 }

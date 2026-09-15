@@ -7,6 +7,7 @@ public sealed record GetProductListQuery : IRequest<TResult<PaginatedList<Produc
     public string? Q { get; init; }
     public string? CategorySlug { get; init; }
     public Guid? ProducerId { get; init; }
+    public string? Standard { get; init; }
     public decimal? MinPrice { get; init; }
     public decimal? MaxPrice { get; init; }
     public string Sort { get; init; } = ProductSort.Newest;
@@ -21,6 +22,7 @@ public sealed class GetProductListQueryValidator : AbstractValidator<GetProductL
     {
         RuleFor(x => x.Q).MaximumLength(200);
         RuleFor(x => x.CategorySlug).MaximumLength(250);
+        RuleFor(x => x.Standard).MaximumLength(50).When(x => !string.IsNullOrWhiteSpace(x.Standard));
         RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
         RuleFor(x => x.PageSize).InclusiveBetween(1, 50);
         RuleFor(x => x.MinPrice).GreaterThanOrEqualTo(0).When(x => x.MinPrice.HasValue);

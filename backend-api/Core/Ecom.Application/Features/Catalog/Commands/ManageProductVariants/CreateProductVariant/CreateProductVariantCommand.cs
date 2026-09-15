@@ -13,7 +13,8 @@ public sealed record CreateProductVariantCommand(
     bool AllowBackorder,
     string? Barcode,
     decimal? WeightGrams,
-    int DisplayOrder) : IRequest<TResult<ProductVariantManagementResult>>, ITransactionalRequest;
+    int DisplayOrder,
+    string? UnitLabel = null) : IRequest<TResult<ProductVariantManagementResult>>, ITransactionalRequest;
 
 public sealed class CreateProductVariantCommandValidator : AbstractValidator<CreateProductVariantCommand>
 {
@@ -26,6 +27,7 @@ public sealed class CreateProductVariantCommandValidator : AbstractValidator<Cre
         RuleFor(x => x.Barcode).MaximumLength(100);
         RuleFor(x => x.WeightGrams).GreaterThan(0).When(x => x.WeightGrams.HasValue);
         RuleFor(x => x.DisplayOrder).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.UnitLabel).MaximumLength(50);
     }
 }
 
@@ -49,7 +51,7 @@ public sealed class CreateProductVariantCommandHandler(
 
         product.ReturnToReviewIfPublished(DateTime.UtcNow);
         var variant = ProductVariant.Create(request.ProductId, request.Sku, request.Name, request.InventoryMode,
-            request.AllowBackorder, request.Barcode, request.WeightGrams, request.DisplayOrder);
+            request.AllowBackorder, request.Barcode, request.WeightGrams, request.DisplayOrder, request.UnitLabel);
         await unitOfWork.Repository<ProductVariant>().InsertAsync(variant, cancellationToken);
         var result = CatalogCommandSupport.RenewVersion(product);
         await unitOfWork.Repository<Product>().UpdateAsync(product, cancellationToken);

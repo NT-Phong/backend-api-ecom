@@ -44,6 +44,24 @@ public class ProductAndCartTests
     }
 
     [Fact]
+    public void Product_standard_and_variant_unit_label_are_normalized_without_old_update_payloads_clearing_them()
+    {
+        var product = Product.Create(Guid.NewGuid(), "Local product", "local-product", "  OCOP 4 sao  ");
+        var variant = ProductVariant.Create(product.Id, "SKU-UNIT", "500 gram", InventoryMode.NotTracked,
+            unitLabel: "  gói  ");
+
+        Assert.Equal("OCOP 4 sao", product.Standard);
+        Assert.Equal("gói", variant.UnitLabel);
+
+        product.UpdateDetails("Local product", "local-product", null, null, null, null, null, null, null,
+            null);
+        variant.UpdateDetails("500 gram", null, null, 0);
+
+        Assert.Equal("OCOP 4 sao", product.Standard);
+        Assert.Equal("gói", variant.UnitLabel);
+    }
+
+    [Fact]
     public void Product_requires_one_primary_category_when_replacing_categories()
     {
         var product = Product.Create(Guid.NewGuid(), "Local product", "local-product");

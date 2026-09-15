@@ -13,7 +13,8 @@ public sealed record UpdateProductVariantCommand(
     decimal? WeightGrams,
     int DisplayOrder,
     InventoryMode InventoryMode,
-    bool AllowBackorder) : IRequest<TResult<ProductManagementResult>>, ITransactionalRequest;
+    bool AllowBackorder,
+    string? UnitLabel = null) : IRequest<TResult<ProductManagementResult>>, ITransactionalRequest;
 
 public sealed class UpdateProductVariantCommandValidator : AbstractValidator<UpdateProductVariantCommand>
 {
@@ -26,6 +27,7 @@ public sealed class UpdateProductVariantCommandValidator : AbstractValidator<Upd
         RuleFor(x => x.Barcode).MaximumLength(100);
         RuleFor(x => x.WeightGrams).GreaterThan(0).When(x => x.WeightGrams.HasValue);
         RuleFor(x => x.DisplayOrder).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.UnitLabel).MaximumLength(50);
     }
 }
 
@@ -54,7 +56,7 @@ public sealed class UpdateProductVariantCommandHandler(
                 ErrorCodes.UNPROCESSABLE_ENTITY);
 
         product.ReturnToReviewIfPublished(DateTime.UtcNow);
-        variant.UpdateDetails(request.Name, request.Barcode, request.WeightGrams, request.DisplayOrder);
+        variant.UpdateDetails(request.Name, request.Barcode, request.WeightGrams, request.DisplayOrder, request.UnitLabel);
         variant.ChangeInventoryPolicy(request.InventoryMode, request.AllowBackorder);
         await unitOfWork.Repository<ProductVariant>().UpdateAsync(variant, cancellationToken);
         var result = CatalogCommandSupport.RenewVersion(product);

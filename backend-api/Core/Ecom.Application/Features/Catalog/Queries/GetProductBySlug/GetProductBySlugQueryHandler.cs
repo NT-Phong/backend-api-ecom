@@ -25,7 +25,7 @@ public sealed class GetProductBySlugQueryHandler(
                   && item.Status == ProductStatus.Published
             select new ProductRow(item.Id, item.Slug, item.Name, item.ShortDescription, item.Description,
                 item.UsageInstructions, item.StorageInstructions, item.WarningText, item.MetaTitle, item.MetaDescription,
-                item.PublishedAt, producer.Id, producer.Code, producer.Name, producer.Description, producer.WebsiteUrl))
+                item.PublishedAt, item.Standard, producer.Id, producer.Code, producer.Name, producer.Description, producer.WebsiteUrl))
             .SingleOrDefaultAsync(cancellationToken);
 
         if (product is null)
@@ -67,7 +67,7 @@ public sealed class GetProductBySlugQueryHandler(
 
         var variants = await unitOfWork.Repository<ProductVariant>().QueryNoTracking()
             .Where(x => x.ProductId == product.Id && x.Status == VariantStatus.Active)
-            .Select(x => new VariantRow(x.Id, x.Sku, x.Name, x.WeightGrams))
+            .Select(x => new VariantRow(x.Id, x.Sku, x.Name, x.WeightGrams, x.UnitLabel))
             .ToListAsync(cancellationToken);
         var asOfUtc = DateTime.UtcNow;
         var prices = await effectivePriceResolver.ResolveForVariantsAsync(variants.Select(x => x.Id).ToArray(), asOfUtc, cancellationToken);
@@ -91,7 +91,7 @@ public sealed class GetProductBySlugQueryHandler(
                 var price = prices[x.Id];
                 return new ProductVariantDto(x.Id, x.Sku, x.Name, price.Amount, price.CurrencyCode, price.PriceType,
                     x.WeightGrams, availability.GetValueOrDefault(x.Id, CatalogAvailabilityStatus.Unavailable),
-                    optionValues.Where(v => v.ProductVariantId == x.Id).Select(v => v.Option).ToList());
+                    optionValues.Where(v => v.ProductVariantId == x.Id).Select(v => v.Option).ToList(), x.UnitLabel);
             })
             .ToList();
 
@@ -102,12 +102,13 @@ public sealed class GetProductBySlugQueryHandler(
                 product.ProducerDescription, product.ProducerWebsiteUrl),
             responseCategories, media, responseVariants, responseVariants.Count > 0,
             availabilityReadService.SummarizeProduct(availability.Values),
-            product.PublishedAt ?? DateTime.MinValue), null));
+            product.PublishedAt ?? DateTime.MinValue, product.Standard,
+            responseVariants.OrderBy(x => x.Price).ThenBy(x => x.Id).Select(x => x.UnitLabel).FirstOrDefault()), null));
     }
 
     private sealed record ProductRow(Guid Id, string Slug, string Name, string? ShortDescription, string? Description,
         string? UsageInstructions, string? StorageInstructions, string? WarningText, string? MetaTitle,
-        string? MetaDescription, DateTime? PublishedAt, Guid ProducerId, string ProducerCode, string ProducerName,
+        string? MetaDescription, DateTime? PublishedAt, string? Standard, Guid ProducerId, string ProducerCode, string ProducerName,
         string? ProducerDescription, string? ProducerWebsiteUrl);
-    private sealed record VariantRow(Guid Id, string Sku, string Name, decimal? WeightGrams);
+    private sealed record VariantRow(Guid Id, string Sku, string Name, decimal? WeightGrams, string? UnitLabel);
 }

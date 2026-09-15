@@ -1,4 +1,4 @@
-﻿namespace Ecom.Domain.Constants;
+namespace Ecom.Domain.Constants;
 
 /// <summary>
 /// Định nghĩa tất cả Permissions/Policies trong hệ thống
@@ -205,7 +205,15 @@ public static class Permissions
             ,new(CatalogCategories.Update, "Cập nhật danh mục", "CatalogCategories")
             ,new(CatalogCategories.Publish, "Xuất bản danh mục", "CatalogCategories")
             ,new(CatalogCategories.Deactivate, "Ẩn danh mục", "CatalogCategories")
+            ,new(Promotions.Read, "Xem quản trị khuyến mãi & mã giảm giá", "Promotions")
+            ,new(Promotions.Manage, "Quản lý khuyến mãi & mã giảm giá", "Promotions")
         };
+    }
+
+    public static class Promotions
+    {
+        public const string Read = "promotions.read";
+        public const string Manage = "promotions.manage";
     }
 }
 

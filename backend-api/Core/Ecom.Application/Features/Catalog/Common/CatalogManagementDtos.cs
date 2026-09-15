@@ -14,7 +14,7 @@ public sealed record CatalogProductManagementDto(Guid Id, Guid ProducerId, strin
     DateTime? PublishedAt, DateTime? UnpublishedAt, Guid ConcurrencyStamp,
     IReadOnlyList<CategorySummaryDto> Categories, IReadOnlyList<CatalogProductMediaDto> Media,
     IReadOnlyList<CatalogProductVariantDto> Variants, IReadOnlyList<CatalogVariantPriceDto> PricePeriods,
-    string? BrandName = null);
+    string? BrandName = null, string? Standard = null);
 
 public sealed record CatalogProductListItemDto(Guid Id, Guid ProducerId, string Name, string Slug,
     ProductStatus Status, DateTime CreatedAt, DateTime? UpdatedAt, CategorySummaryDto? PrimaryCategory,
@@ -33,7 +33,8 @@ public sealed record CatalogProductMediaDto(Guid MediaAssetId, string OriginalFi
     bool IsPrimary, string? Caption);
 
 public sealed record CatalogProductVariantDto(Guid Id, string Sku, string Name, VariantStatus Status,
-    InventoryMode InventoryMode, bool AllowBackorder, string? Barcode, decimal? WeightGrams, int DisplayOrder);
+    InventoryMode InventoryMode, bool AllowBackorder, string? Barcode, decimal? WeightGrams, int DisplayOrder,
+    string? UnitLabel = null);
 
 public sealed record CatalogVariantPriceDto(Guid Id, Guid ProductVariantId, decimal Amount, string CurrencyCode,
     PriceType PriceType, int MinQuantity, DateTime EffectiveFrom, DateTime? EffectiveTo, Guid? PriceListId);

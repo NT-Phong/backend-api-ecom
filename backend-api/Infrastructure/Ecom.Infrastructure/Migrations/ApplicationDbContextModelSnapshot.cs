@@ -1329,6 +1329,10 @@ namespace Ecom.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"IsDeleted\" = false");
 
+                    b.HasIndex("CouponId", "UserId")
+                        .HasDatabaseName("IX_CouponRedemption_CouponId_UserId_Active")
+                        .HasFilter("\"IsDeleted\" = false");
+
                     b.ToTable("Tbl_CouponRedemption", null, t =>
                         {
                             t.HasCheckConstraint("CK_CouponRedemption_DiscountAmount", "\"DiscountAmount\" >= 0");
@@ -2493,6 +2497,10 @@ namespace Ecom.Infrastructure.Migrations
                     b.Property<Guid?>("AdministrativeAreaId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AppliedCouponCodeSnapshot")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("uuid");
@@ -2515,6 +2523,10 @@ namespace Ecom.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("CustomerNotesSnapshot")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("CustomerPhoneSnapshot")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -2525,6 +2537,10 @@ namespace Ecom.Infrastructure.Migrations
 
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("DeliverySlotSnapshot")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<decimal>("DiscountAmount")
                         .ValueGeneratedOnAdd()
@@ -2555,6 +2571,10 @@ namespace Ecom.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<string>("PackagingOptionSnapshot")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("PlacedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4792,6 +4812,10 @@ namespace Ecom.Infrastructure.Migrations
                         .HasMaxLength(350)
                         .HasColumnType("character varying(350)");
 
+                    b.Property<string>("Standard")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -5611,6 +5635,10 @@ namespace Ecom.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("UnitLabel")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
